@@ -7,7 +7,7 @@ export default function Home() {
         <div className="text-center space-y-8 mb-16">
           <div className="space-y-4">
             <h1 className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-              ContractSentinel
+              Clause Clarity
             </h1>
             <p className="text-xl sm:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
               Upload your contract for instant sentiment analysis and risk assessment
@@ -74,7 +74,7 @@ export default function Home() {
 
         <div className="mt-16 text-center">
           <p className="text-slate-500 max-w-2xl mx-auto">
-            ContractSentinel leverages advanced AI to analyze your contracts for fairness, 
+            Clause Clarity leverages advanced AI to analyze your contracts for fairness, 
             identify potential biases, and assess risks with industry-leading accuracy.
           </p>
         </div>
