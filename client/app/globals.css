@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --neutral: #6b7280;
+  --card: #ffffff;
+  --text: #1f2937;
+  --text-light: #6b7280;
+  --border: #e5e7eb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --primary: #3b82f6;
+    --primary-light: #60a5fa;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --neutral: #9ca3af;
+    --card: #1a1a1a;
+    --text: #f3f4f6;
+    --text-light: #9ca3af;
+    --border: #374151;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Additional styles for contract sentiment UI */
+.sentiment-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.sentiment-positive {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.sentiment-negative {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.sentiment-neutral {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: var(--neutral);
+}
+
+.sentiment-biased-buyer {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--primary);
+}
+
+.sentiment-biased-seller {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.clause-text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 1rem;
+  background-color: rgba(243, 244, 246, 0.5);
+  border-radius: 0.25rem;
+  border-left: 3px solid var(--primary-light);
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+}
+
+.recommendation-item {
+  padding: 1rem;
+  border-left: 3px solid var(--primary);
+  background-color: rgba(37, 99, 235, 0.05);
+  margin-bottom: 1rem;
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.highlight {
+  background-color: rgba(245, 158, 11, 0.2);
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+}
