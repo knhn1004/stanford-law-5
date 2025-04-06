@@ -498,17 +498,72 @@ async def query_document(request: QueryRequest):
         messages = [
             {
                 "role": "system",
-                "content": """You are a contract analysis assistant that provides structured analysis of legal documents.
+                "content": """You are an expert legal contract analyzer with deep expertise in contract law and fairness assessment.
+                You provide precise, objective analysis of legal documents with a focus on:
+                1. Accurate fairness scoring based on industry standards and legal precedent
+                2. Consistent correlation between bias scores and risk levels
+                3. Clear identification of power imbalances between parties
+                4. Objective measurement of clause favorability
+
+                Scoring Guidelines:
+                - Overall Fairness Score (0-100): 
+                  * Score MUST be below 50 for contracts with significant power imbalances
+                  * Score MUST be below 30 for contracts with complete IP rights assignment to one party
+                  * Consider industry standards and typical compensation
+                  * Evaluate long-term implications for all parties
+
+                - Bias Score (0-100): Must directly correlate with Risk Level
+                  * 0-33: Low Risk
+                  * 34-66: Medium Risk
+                  * 67-100: High Risk
+
+                - Clause Fairness (0-10): 
+                  For IP Rights and Assignment Clauses:
+                  * Score 0-3: Complete assignment of rights to one party with minimal/no compensation
+                  * Score 4-6: Assignment with fair compensation or limited scope
+                  * Score 7-10: Balanced rights sharing or fair compensation structure
+                  
+                  For Payment Clauses:
+                  * Score 0-3: Significantly below market rate or unfair terms
+                  * Score 4-6: Market standard compensation
+                  * Score 7-10: Above market rate or favorable terms
+
+                  For General Clauses:
+                  * Score based on:
+                    - Balance of rights and obligations
+                    - Industry standard comparisons
+                    - Legal precedent
+                    - Power dynamics between parties
+
+                Specific Guidelines for IP Rights Analysis:
+                1. Complete IP assignment to one party should be reflected as:
+                   - High bias score (>80)
+                   - High risk level
+                   - Low fairness score (<3)
+                2. Consider compensation relative to potential IP value
+                3. Evaluate restrictions on participant's future use of their own work
+                4. Compare against industry standard practices for similar events/programs
+
                 Your responses must be in valid JSON format following the exact schema provided.
                 Do not include any explanatory text or markdown formatting outside the JSON structure.
-                If you are unsure about any values, use reasonable defaults rather than omitting fields.
-                Ensure all string values are properly escaped and all numbers are valid."""
+                If you are unsure about any values, use conservative estimates that reflect potential risks to the weaker party."""
             },
             {
                 "role": "user",
                 "content": f"""Analyze the following contract text for sentiment, bias, and fairness.
-                Focus on identifying vendor-favorable vs customer-favorable clauses.
-                Provide an overall fairness score out of 100, risk assessment, and recommendations.
+                Specifically evaluate:
+                1. Power dynamics between parties
+                2. Rights and obligations balance
+                3. Industry standard comparisons
+                4. Potential risks to the weaker party
+                5. Legal implications of clause language
+
+                When assigning scores:
+                - Be conservative - favor protecting the weaker party
+                - Compare against industry standards
+                - Consider legal precedent
+                - Evaluate practical implications
+                - Assess long-term consequences
 
                 Contract text from relevant sections:
                 {' '.join(contexts)}
@@ -518,31 +573,31 @@ async def query_document(request: QueryRequest):
                   "contractName": string,
                   "description": string,
                   "metrics": {{
-                    "overallFairnessScore": number,
+                    "overallFairnessScore": number,  // 0-100, below 50 for significant power imbalances
                     "potentialBiasIndicators": number,
                     "highRiskClauses": number,
                     "balancedClauses": number
                   }},
                   "sentimentDistribution": {{
-                    "vendorFavorable": number,
-                    "balanced": number,
-                    "customerFavorable": number,
-                    "neutral": number
+                    "vendorFavorable": number,  // Percentage (0-100)
+                    "balanced": number,         // Percentage (0-100)
+                    "customerFavorable": number, // Percentage (0-100)
+                    "neutral": number           // Percentage (0-100)
                   }},
                   "notableClauses": [
                     {{
                       "type": string,
                       "sentiment": string,
                       "sentimentLabel": string,
-                      "biasScore": number,
-                      "riskLevel": string,
+                      "biasScore": number,      // 0-100, must correlate with riskLevel
+                      "riskLevel": string,      // "Low" (0-33), "Medium" (34-66), "High" (67-100)
                       "riskLabel": string,
                       "text": string,
                       "analysis": string,
                       "biasIndicators": [
                         {{
                           "label": string,
-                          "value": number
+                          "value": number       // 0-100
                         }}
                       ],
                       "industryComparison": string,
@@ -559,7 +614,7 @@ async def query_document(request: QueryRequest):
                       }}
                     ],
                     "riskAssessment": {{
-                      "level": string,
+                      "level": string,          // Must match highest risk level from notableClauses
                       "label": string,
                       "description": string
                     }}
