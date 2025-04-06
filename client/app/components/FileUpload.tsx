@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function FileUpload() {
@@ -8,6 +8,7 @@ export default function FileUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -36,6 +37,12 @@ export default function FileUpload() {
     },
     []
   );
+
+  const handleClick = useCallback(() => {
+    if (!isUploading && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, [isUploading]);
 
   const handleFileUpload = async (file: File) => {
     // Check if file is a PDF
@@ -83,6 +90,7 @@ export default function FileUpload() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={handleClick}
       >
         <div className="flex flex-col items-center justify-center">
           <svg
@@ -116,6 +124,7 @@ export default function FileUpload() {
           )}
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
           <input
+            ref={fileInputRef}
             type="file"
             className="hidden"
             accept=".pdf"
