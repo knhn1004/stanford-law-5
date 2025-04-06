@@ -15,8 +15,9 @@ export default function ProgressBar({
   label,
   className = "",
 }: ProgressBarProps) {
-  // Ensure value is between 0 and 100
-  const percentage = Math.min(Math.max(value, 0), 100);
+  // Force the percentage to be at least 20% if a value exists, for visual clarity
+  // This is a workaround to ensure progress is always visible
+  const percentage = value ? Math.max(Math.min(Math.max(value, 20), 100), 20) : 0;
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
@@ -27,7 +28,7 @@ export default function ProgressBar({
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
-      {showLabel && <span className="text-xs w-8">{percentage}%</span>}
+      {showLabel && <span className="text-xs w-8">{value}%</span>}
     </div>
   );
 }

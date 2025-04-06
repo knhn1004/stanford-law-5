@@ -1,34 +1,37 @@
 import React from "react";
 
-type SentimentType =
+export type SentimentType =
   | "positive"
   | "negative"
   | "neutral"
   | "biased-buyer"
-  | "biased-seller";
+  | "biased-seller"
+  | "high"
+  | "medium"
+  | "low";
 
 interface SentimentBadgeProps {
   type: SentimentType;
-  label: string;
+  label?: string;
 }
 
 export default function SentimentBadge({ type, label }: SentimentBadgeProps) {
-  const getBadgeClass = () => {
-    switch (type) {
-      case "positive":
-        return "sentiment-positive";
-      case "negative":
-        return "sentiment-negative";
-      case "neutral":
-        return "sentiment-neutral";
-      case "biased-buyer":
-        return "sentiment-biased-buyer";
-      case "biased-seller":
-        return "sentiment-biased-seller";
-      default:
-        return "sentiment-neutral";
-    }
+  const baseClasses = "sentiment-badge";
+  
+  const typeClasses = {
+    "positive": "sentiment-positive",
+    "negative": "sentiment-negative",
+    "neutral": "sentiment-neutral",
+    "biased-buyer": "sentiment-biased-buyer",
+    "biased-seller": "sentiment-biased-seller",
+    "high": "sentiment-negative",
+    "medium": "sentiment-neutral",
+    "low": "sentiment-positive"
   };
 
-  return <span className={`sentiment-badge ${getBadgeClass()}`}>{label}</span>;
+  return (
+    <span className={`${baseClasses} ${typeClasses[type]}`}>
+      {label || type}
+    </span>
+  );
 }
