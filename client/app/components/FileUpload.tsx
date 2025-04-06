@@ -21,31 +21,7 @@ export default function FileUpload() {
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files[0]);
-    }
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-        handleFileUpload(e.target.files[0]);
-      }
-    },
-    []
-  );
-
-  const handleClick = useCallback(() => {
-    if (!isUploading && fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  }, [isUploading]);
-
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = useCallback(async (file: File) => {
     // Check if file is a PDF
     if (file.type !== "application/pdf") {
       setError("Please upload a PDF file");
@@ -74,7 +50,32 @@ export default function FileUpload() {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsUploading(false);
     }
-  };
+  }, [router]);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  }, [handleFileUpload]);
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFileUpload(e.target.files[0]);
+      }
+    },
+    []
+  );
+
+  const handleClick = useCallback(() => {
+    if (!isUploading && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, [isUploading]);
+
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -85,6 +86,7 @@ export default function FileUpload() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={handleClick}
       >
         <div className="flex flex-col items-center justify-center">
           <svg
@@ -101,13 +103,11 @@ export default function FileUpload() {
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
             />
           </svg>
-          <button 
-            onClick={handleClick}
-            disabled={isUploading}
-            className="mb-2 font-medium text-blue-600 hover:text-blue-800 focus:outline-none disabled:opacity-50"
+          <div 
+            className={`mb-2 font-medium text-blue-600 hover:text-blue-800 ${isUploading ? 'opacity-50' : ''}`}
           >
             Click to upload
-          </button>
+          </div>
           <p className="text-sm text-gray-500">
             or drag and drop
           </p>
