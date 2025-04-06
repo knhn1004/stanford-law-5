@@ -53,7 +53,27 @@ export interface ContractAnalysis {
 		customerFavorable: number;
 		neutral: number;
 	};
-	notableClauses: NotableClause[];
+	notableClauses: Array<{
+		type: string;
+		sentiment: string;
+		sentimentLabel: string;
+		biasScore: number;
+		riskLevel: string;
+		riskLabel: string;
+		text: string;
+		analysis: string;
+		biasIndicators: Array<{
+			label: string;
+			value: number;
+		}>;
+		industryComparison: string;
+		recommendations: string[];
+		legalPrecedents: Array<{
+			case: string;
+			relevance: string;
+			implication: string;
+		}>;
+	}>;
 	industryBenchmarking: {
 		fairnessScore: number;
 		percentile: number;
@@ -62,13 +82,31 @@ export interface ContractAnalysis {
 	summary: {
 		title: string;
 		description: string;
-		points: SummaryPoint[];
+		points: Array<{
+			title: string;
+			description: string;
+		}>;
 		riskAssessment: {
 			level: string;
 			label: string;
 			description: string;
 		};
 	};
+	legalReferences: Array<{
+		title: string;
+		description: string;
+		url: string;
+	}>;
+	industryStandards: Array<{
+		name: string;
+		description: string;
+		complianceStatus: string;
+	}>;
+	regulatoryGuidelines: Array<{
+		regulation: string;
+		relevance: string;
+		complianceStatus: string;
+	}>;
 }
 
 // Function to upload a contract to FastAPI server
@@ -175,6 +213,28 @@ export async function generateAnalysis(docId: string) {
 						description: 'Risk assessment based on contract analysis.',
 					},
 				},
+				// Add missing properties for legal references and standards
+				legalReferences: Array.isArray(parsedResponse.legalReferences)
+					? parsedResponse.legalReferences.map(ref => ({
+						title: ref.title || '',
+						description: typeof ref.description === 'string' ? ref.description : '',
+						url: typeof ref.url === 'string' ? ref.url : '#',
+					}))
+					: [],
+				industryStandards: Array.isArray(parsedResponse.industryStandards)
+					? parsedResponse.industryStandards.map(standard => ({
+						name: standard.name || '',
+						description: typeof standard.description === 'string' ? standard.description : '',
+						complianceStatus: standard.complianceStatus || 'Unknown',
+					}))
+					: [],
+				regulatoryGuidelines: Array.isArray(parsedResponse.regulatoryGuidelines)
+					? parsedResponse.regulatoryGuidelines.map(guideline => ({
+						regulation: guideline.regulation || '',
+						relevance: typeof guideline.relevance === 'string' ? guideline.relevance : '',
+						complianceStatus: guideline.complianceStatus || 'Unknown',
+					}))
+					: [],
 			};
 
 			// Store the analysis data in localStorage for later retrieval
@@ -220,6 +280,9 @@ export async function generateAnalysis(docId: string) {
 						description: 'Analysis failed due to technical issues.',
 					},
 				},
+				legalReferences: [],
+				industryStandards: [],
+				regulatoryGuidelines: [],
 			};
 
 			localStorage.setItem(

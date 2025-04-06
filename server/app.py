@@ -21,6 +21,9 @@ import psycopg2
 import psycopg2.extras
 from groq import Groq
 import json
+import requests
+import html
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -443,6 +446,112 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Simple DuckDuckGo search function
+def duckduckgo_search(query, max_results=5):
+    """Perform a search using DuckDuckGo."""
+    try:
+        # Clean the query for URL
+        query = query.replace(" ", "+")
+
+        # Make the request to DuckDuckGo
+        url = f"https://html.duckduckgo.com/html/?q={query}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        # Extract search results using regex
+        results = []
+        pattern = r'<a class="result__a" href="(.*?)".*?>(.*?)</a>.*?<a class="result__snippet".*?>(.*?)</a>'
+        matches = re.findall(pattern, response.text, re.DOTALL)
+
+        for i, match in enumerate(matches):
+            if i >= max_results:
+                break
+
+            # Extract the raw URL and decode it
+            raw_url = match[0]
+            if "uddg=" in raw_url:
+                # DuckDuckGo redirects with this parameter
+                url_start = raw_url.find("uddg=") + 5
+                decoded_url = raw_url[url_start:]
+                if "&" in decoded_url:
+                    decoded_url = decoded_url.split("&")[0]
+                # URL decode
+                try:
+                    from urllib.parse import unquote
+
+                    url = unquote(decoded_url)
+                except:
+                    url = decoded_url
+            else:
+                url = raw_url
+
+            # Make sure URL has a protocol
+            if not url.startswith(("http://", "https://")):
+                url = "https://" + url.lstrip("/")
+
+            # Clean HTML from title and snippet
+            title = html.unescape(re.sub(r"<.*?>", "", match[1]))
+            snippet = html.unescape(re.sub(r"<.*?>", "", match[2]))
+
+            results.append({"title": title, "url": url, "snippet": snippet})
+
+        return results
+    except Exception as e:
+        logger.error(f"Error in DuckDuckGo search: {str(e)}")
+        return []
+
+
+# Define a function to get more info about a legal topic
+def get_legal_info(topic):
+    """Get information about a legal topic using DuckDuckGo search."""
+    search_query = f"legal precedent {topic} law contract"
+    results = duckduckgo_search(search_query)
+
+    # Format the results
+    formatted_results = []
+    for result in results:
+        formatted_results.append(
+            {
+                "title": result["title"],
+                "description": result["snippet"],
+                "url": result["url"],
+            }
+        )
+
+    return formatted_results
+
+
+# Replace Composio toolset and agent with direct implementation
+# Remove this section:
+# Initialize Composio toolset and Groq LLM
+# toolset = ComposioToolSet()
+# tools = toolset.get_tools(apps=[App.TAVILY])  # Add Tavily search tool
+
+# Initialize Groq LLM
+llm = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Define system message for the agent
+system_message = """You are an expert legal contract analyzer with deep expertise in contract law and fairness assessment.
+You have access to search capabilities that can help you find relevant legal information, precedents, and industry standards.
+Use this information to enrich your analysis with:
+1. Relevant legal precedents and case law
+2. Industry standard practices and benchmarks
+3. Recent regulatory changes or guidelines
+4. Similar contract examples and their outcomes
+
+For each clause you analyze:
+1. Consider relevant legal precedents
+2. Compare against industry standards
+3. Check for recent regulatory changes
+4. Identify potential compliance issues
+
+Your analysis should be thorough, well-researched, and supported by concrete examples and references."""
+
+
 @app.post("/query", response_model=QueryResponse)
 async def query_document(request: QueryRequest):
     """Query the document(s) with optional document filtering."""
@@ -461,215 +570,213 @@ async def query_document(request: QueryRequest):
 
         if not results:
             return QueryResponse(
-                response=json.dumps({
-                    "contractName": f"Contract {request.doc_id}",
-                    "description": "No relevant information found in the contract.",
-                    "metrics": {
-                        "overallFairnessScore": 50,
-                        "potentialBiasIndicators": 0,
-                        "highRiskClauses": 0,
-                        "balancedClauses": 0
-                    },
-                    "sentimentDistribution": {
-                        "vendorFavorable": 25,
-                        "balanced": 25,
-                        "customerFavorable": 25,
-                        "neutral": 25
-                    },
-                    "notableClauses": [],
-                    "summary": {
-                        "title": "Analysis Summary",
-                        "description": "No relevant contract sections found for analysis.",
-                        "points": [],
-                        "riskAssessment": {
-                            "level": "neutral",
-                            "label": "Unknown",
-                            "description": "Insufficient information for risk assessment."
-                        }
+                response=json.dumps(
+                    {
+                        "contractName": f"Contract {request.doc_id}",
+                        "description": "No relevant information found in the contract.",
+                        "metrics": {
+                            "overallFairnessScore": 50,
+                            "potentialBiasIndicators": 0,
+                            "highRiskClauses": 0,
+                            "balancedClauses": 0,
+                        },
+                        "sentimentDistribution": {
+                            "vendorFavorable": 25,
+                            "balanced": 25,
+                            "customerFavorable": 25,
+                            "neutral": 25,
+                        },
+                        "notableClauses": [],
+                        "summary": {
+                            "title": "Analysis Summary",
+                            "description": "No relevant contract sections found for analysis.",
+                            "points": [],
+                            "riskAssessment": {
+                                "level": "neutral",
+                                "label": "Unknown",
+                                "description": "Insufficient information for risk assessment.",
+                            },
+                        },
+                        "legalReferences": [],
+                        "industryStandards": [],
+                        "regulatoryGuidelines": [],
                     }
-                }),
+                ),
                 doc_id=request.doc_id,
             )
 
         # Extract the content from the most relevant results
         contexts = [result["content"] for result in results]
 
-        # Create messages for Groq chat completion with structured output instruction
-        messages = [
-            {
-                "role": "system",
-                "content": """You are an expert legal contract analyzer with deep expertise in contract law and fairness assessment.
-                You provide precise, objective analysis of legal documents with a focus on:
-                1. Accurate fairness scoring based on industry standards and legal precedent
-                2. Consistent correlation between bias scores and risk levels
-                3. Clear identification of power imbalances between parties
-                4. Objective measurement of clause favorability
+        # Get enrichment information using DuckDuckGo search
+        contract_topic = " ".join(
+            contexts[:100]
+        )  # Use a portion of the contract to identify topic
+        legal_info = get_legal_info(contract_topic)
 
-                Scoring Guidelines:
-                - Overall Fairness Score (0-100): 
-                  * Score MUST be below 50 for contracts with significant power imbalances
-                  * Score MUST be below 30 for contracts with complete IP rights assignment to one party
-                  * Consider industry standards and typical compensation
-                  * Evaluate long-term implications for all parties
-
-                - Bias Score (0-100): Must directly correlate with Risk Level
-                  * 0-33: Low Risk
-                  * 34-66: Medium Risk
-                  * 67-100: High Risk
-
-                - Clause Fairness (0-10): 
-                  For IP Rights and Assignment Clauses:
-                  * Score 0-3: Complete assignment of rights to one party with minimal/no compensation
-                  * Score 4-6: Assignment with fair compensation or limited scope
-                  * Score 7-10: Balanced rights sharing or fair compensation structure
-                  
-                  For Payment Clauses:
-                  * Score 0-3: Significantly below market rate or unfair terms
-                  * Score 4-6: Market standard compensation
-                  * Score 7-10: Above market rate or favorable terms
-
-                  For General Clauses:
-                  * Score based on:
-                    - Balance of rights and obligations
-                    - Industry standard comparisons
-                    - Legal precedent
-                    - Power dynamics between parties
-
-                Specific Guidelines for IP Rights Analysis:
-                1. Complete IP assignment to one party should be reflected as:
-                   - High bias score (>80)
-                   - High risk level
-                   - Low fairness score (<3)
-                2. Consider compensation relative to potential IP value
-                3. Evaluate restrictions on participant's future use of their own work
-                4. Compare against industry standard practices for similar events/programs
-
-                Your responses must be in valid JSON format following the exact schema provided.
-                Do not include any explanatory text or markdown formatting outside the JSON structure.
-                If you are unsure about any values, use conservative estimates that reflect potential risks to the weaker party."""
-            },
-            {
-                "role": "user",
-                "content": f"""Analyze the following contract text for sentiment, bias, and fairness.
-                Specifically evaluate:
-                1. Power dynamics between parties
-                2. Rights and obligations balance
-                3. Industry standard comparisons
-                4. Potential risks to the weaker party
-                5. Legal implications of clause language
-
-                When assigning scores:
-                - Be conservative - favor protecting the weaker party
-                - Compare against industry standards
-                - Consider legal precedent
-                - Evaluate practical implications
-                - Assess long-term consequences
-
-                Contract text from relevant sections:
-                {' '.join(contexts)}
-
-                Return your analysis in this exact JSON structure, with no additional text or formatting:
-                {{
-                  "contractName": string,
-                  "description": string,
-                  "metrics": {{
-                    "overallFairnessScore": number,  // 0-100, below 50 for significant power imbalances
-                    "potentialBiasIndicators": number,
-                    "highRiskClauses": number,
-                    "balancedClauses": number
-                  }},
-                  "sentimentDistribution": {{
-                    "vendorFavorable": number,  // Percentage (0-100)
-                    "balanced": number,         // Percentage (0-100)
-                    "customerFavorable": number, // Percentage (0-100)
-                    "neutral": number           // Percentage (0-100)
-                  }},
-                  "notableClauses": [
-                    {{
-                      "type": string,
-                      "sentiment": string,
-                      "sentimentLabel": string,
-                      "biasScore": number,      // 0-100, must correlate with riskLevel
-                      "riskLevel": string,      // "Low" (0-33), "Medium" (34-66), "High" (67-100)
-                      "riskLabel": string,
-                      "text": string,
-                      "analysis": string,
-                      "biasIndicators": [
-                        {{
-                          "label": string,
-                          "value": number       // 0-100
-                        }}
-                      ],
-                      "industryComparison": string,
-                      "recommendations": [string]
-                    }}
-                  ],
-                  "summary": {{
-                    "title": string,
-                    "description": string,
-                    "points": [
-                      {{
-                        "title": string,
-                        "description": string
-                      }}
-                    ],
-                    "riskAssessment": {{
-                      "level": string,          // Must match highest risk level from notableClauses
-                      "label": string,
-                      "description": string
-                    }}
-                  }}
-                }}"""
-            }
-        ]
-
-        # Get response from Groq
+        # Use Groq to analyze the contract with enriched information
         try:
-            completion = groq_client.chat.completions.create(
-                messages=messages,
+            response = groq_client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {
+                        "role": "user",
+                        "content": f"""Analyze the following contract sections with focus on legal precedents, industry standards, and regulatory compliance:
+
+                    Contract sections:
+                    {' '.join(contexts)}
+                    
+                    Additional legal information:
+                    {json.dumps(legal_info, indent=2)}
+
+                    Provide a comprehensive analysis including:
+                    1. Fairness and bias assessment
+                    2. Relevant legal precedents
+                    3. Industry standard comparisons
+                    4. Regulatory compliance issues
+                    5. Risk assessment
+                    
+                    Return the analysis in this exact JSON structure:
+                    {{
+                        "contractName": string,
+                        "description": string,
+                        "metrics": {{
+                            "overallFairnessScore": number,
+                            "potentialBiasIndicators": number,
+                            "highRiskClauses": number,
+                            "balancedClauses": number
+                        }},
+                        "sentimentDistribution": {{
+                            "vendorFavorable": number,
+                            "balanced": number,
+                            "customerFavorable": number,
+                            "neutral": number
+                        }},
+                        "notableClauses": [
+                            {{
+                                "type": string,
+                                "sentiment": string,
+                                "sentimentLabel": string,
+                                "biasScore": number,
+                                "riskLevel": string,
+                                "riskLabel": string,
+                                "text": string,
+                                "analysis": string,
+                                "biasIndicators": [
+                                    {{
+                                        "label": string,
+                                        "value": number
+                                    }}
+                                ],
+                                "industryComparison": string,
+                                "recommendations": [string],
+                                "legalPrecedents": [
+                                    {{
+                                        "case": string,
+                                        "relevance": string,
+                                        "implication": string
+                                    }}
+                                ]
+                            }}
+                        ],
+                        "summary": {{
+                            "title": string,
+                            "description": string,
+                            "points": [
+                                {{
+                                    "title": string,
+                                    "description": string
+                                }}
+                            ],
+                            "riskAssessment": {{
+                                "level": string,
+                                "label": string,
+                                "description": string
+                            }}
+                        }},
+                        "legalReferences": [
+                            {{
+                                "title": string,
+                                "description": string,
+                                "url": string
+                            }}
+                        ],
+                        "industryStandards": [
+                            {{
+                                "name": string,
+                                "description": string,
+                                "complianceStatus": string
+                            }}
+                        ],
+                        "regulatoryGuidelines": [
+                            {{
+                                "regulation": string,
+                                "relevance": string,
+                                "complianceStatus": string
+                            }}
+                        ]
+                    }}""",
+                    },
+                ],
                 model="llama-3.3-70b-versatile",
-                temperature=0.1,
-                max_tokens=2048,
-                response_format={"type": "json_object"}
+                temperature=0.2,
+                max_tokens=4000,
             )
-            
-            # Parse the response to ensure it's valid JSON and properly formatted
+
+            response_text = response.choices[0].message.content
+
+            # Clean up response text to ensure it's valid JSON
+            # Remove markdown code blocks if present
+            response_text = re.sub(r"^```json\s*", "", response_text)
+            response_text = re.sub(r"\s*```$", "", response_text)
+
+            # Try to parse and re-serialize to ensure valid JSON
             try:
-                response_json = json.loads(completion.choices[0].message.content)
-                response_text = json.dumps(response_json)  # Re-serialize to ensure proper formatting
+                # Parse to check if it's valid JSON
+                json_object = json.loads(response_text)
+                # Re-serialize to ensure clean JSON
+                response_text = json.dumps(json_object)
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON from LLM: {str(e)}")
+                logger.error(f"Invalid JSON from Groq: {str(e)}")
                 # Return a default response if JSON is invalid
-                response_text = json.dumps({
-                    "contractName": f"Contract {request.doc_id}",
-                    "description": "Error processing contract analysis.",
-                    "metrics": {
-                        "overallFairnessScore": 50,
-                        "potentialBiasIndicators": 0,
-                        "highRiskClauses": 0,
-                        "balancedClauses": 0
-                    },
-                    "sentimentDistribution": {
-                        "vendorFavorable": 25,
-                        "balanced": 25,
-                        "customerFavorable": 25,
-                        "neutral": 25
-                    },
-                    "notableClauses": [],
-                    "summary": {
-                        "title": "Analysis Error",
-                        "description": "An error occurred while analyzing the contract.",
-                        "points": [],
-                        "riskAssessment": {
-                            "level": "neutral",
-                            "label": "Unknown",
-                            "description": "Analysis failed due to technical issues."
-                        }
+                response_text = json.dumps(
+                    {
+                        "contractName": f"Contract {request.doc_id}",
+                        "description": "Error processing contract analysis.",
+                        "metrics": {
+                            "overallFairnessScore": 50,
+                            "potentialBiasIndicators": 0,
+                            "highRiskClauses": 0,
+                            "balancedClauses": 0,
+                        },
+                        "sentimentDistribution": {
+                            "vendorFavorable": 25,
+                            "balanced": 25,
+                            "customerFavorable": 25,
+                            "neutral": 25,
+                        },
+                        "notableClauses": [],
+                        "summary": {
+                            "title": "Analysis Error",
+                            "description": "An error occurred while analyzing the contract.",
+                            "points": [],
+                            "riskAssessment": {
+                                "level": "neutral",
+                                "label": "Unknown",
+                                "description": "Analysis failed due to technical issues.",
+                            },
+                        },
+                        "legalReferences": [],
+                        "industryStandards": [],
+                        "regulatoryGuidelines": [],
                     }
-                })
+                )
+
         except Exception as e:
-            logger.error(f"Error getting completion from Groq: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to get response from LLM")
+            logger.error(f"Error getting response from Groq: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail="Failed to get response from Groq LLM"
+            )
 
         return QueryResponse(response=response_text, doc_id=request.doc_id)
 

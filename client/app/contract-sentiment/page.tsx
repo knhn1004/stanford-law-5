@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import SentimentBadge, { SentimentType } from '../components/SentimentBadge';
-import ProgressBar from '../components/ProgressBar';
 import {
 	getContractAnalysis,
 	ContractAnalysis,
@@ -12,6 +11,7 @@ import {
 	PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar,
 	XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
+import ProgressBar from '../components/ProgressBar';
 
 export default function ContractSentimentPage() {
 	const [analysis, setAnalysis] = useState<ContractAnalysis | null>(null);
@@ -225,7 +225,7 @@ export default function ContractSentimentPage() {
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 				<div className="legal-card text-center">
 					<div className="text-3xl font-serif font-bold text-slate-700 mb-2">
 						{analysis.metrics.overallFairnessScore}
@@ -366,13 +366,13 @@ export default function ContractSentimentPage() {
 									>
 										<td className="py-4 px-4 font-medium text-slate-800">{clause.type}</td>
 										<td className="py-4 px-4">
-											<SentimentBadge type={clause.sentiment} label={clause.sentimentLabel} />
+											<SentimentBadge type={clause.sentiment.toLowerCase() as SentimentType} label={clause.sentimentLabel} />
 										</td>
 										<td className="py-4 px-4">
 											<ProgressBar value={clause.biasScore} color="bg-slate-700" />
 										</td>
 										<td className="py-4 px-4">
-											<SentimentBadge type={clause.riskLevel} label={clause.riskLabel} />
+											<SentimentBadge type={clause.riskLevel.toLowerCase() as SentimentType} label={clause.riskLabel} />
 										</td>
 									</tr>
 								))
@@ -393,81 +393,104 @@ export default function ContractSentimentPage() {
 					Detailed Analysis
 				</h2>
 
-				{analysis.notableClauses && analysis.notableClauses.length > 0 ? (
-					<div className="space-y-6">
-						{analysis.notableClauses.map((clause, i) => (
-							<div key={i} className="legal-card border-l-4" style={{ borderLeftColor: '#334155' }}>
-								<div className="flex justify-between items-start mb-4">
-									<div>
-										<h3 className="text-lg font-serif font-semibold text-slate-800 mb-2">
-											{clause.type || 'Clause ' + (i + 1)}
-										</h3>
-										<SentimentBadge
-											type={clause.sentiment}
-											label={clause.sentimentLabel || clause.sentiment}
-										/>
-									</div>
-									<div className="text-right">
-										<div className={`text-sm font-medium px-3 py-1 rounded ${
-											clause.biasScore >= 8
-												? 'bg-emerald-50 text-emerald-700'
-												: clause.biasScore >= 5
-												? 'bg-amber-50 text-amber-700'
-												: 'bg-rose-50 text-rose-700'
-										}`}>
-											Risk Score: {clause.biasScore}/100
-										</div>
-									</div>
+				<div className="space-y-6">
+					{analysis.notableClauses.map((clause, index) => (
+						<div key={index} className="border-b border-slate-200 last:border-0 pb-6 last:pb-0">
+							<div className="flex items-center justify-between mb-4">
+								<h4 className="font-medium text-slate-800">
+									{clause.type}
+								</h4>
+								<div className="flex items-center space-x-2">
+									<span className={`px-3 py-1 rounded-full text-sm ${
+										clause.riskLevel.toLowerCase() === 'high'
+											? 'bg-red-100 text-red-800'
+											: clause.riskLevel.toLowerCase() === 'medium'
+											? 'bg-yellow-100 text-yellow-800'
+											: 'bg-green-100 text-green-800'
+									}`}>
+										{clause.riskLabel}
+									</span>
+									<span className={`px-3 py-1 rounded-full text-sm ${
+										clause.sentiment.toLowerCase() === 'negative'
+											? 'bg-red-100 text-red-800'
+											: clause.sentiment.toLowerCase() === 'neutral'
+											? 'bg-slate-100 text-slate-800'
+											: 'bg-green-100 text-green-800'
+									}`}>
+										{clause.sentimentLabel}
+									</span>
 								</div>
-
-								<div className="clause-text mb-6">
-									{clause.text}
-								</div>
-
-								<div className="grid md:grid-cols-3 gap-6">
-									<div>
-										<h4 className="font-serif font-medium text-slate-800 mb-3">Risk Indicators</h4>
-										{clause.biasIndicators && clause.biasIndicators.length > 0 ? (
-											clause.biasIndicators.map((indicator, i) => (
-												<div key={i} className="mb-2">
-													<ProgressBar
-														value={indicator.value}
-														color={i === 0 ? 'bg-rose-700' : i === 1 ? 'bg-slate-700' : 'bg-slate-500'}
-														label={indicator.label}
-													/>
-												</div>
-											))
-										) : (
-											<p className="text-sm text-slate-500">No risk indicators found</p>
-										)}
-									</div>
-
-									<div className="md:col-span-2">
-										<h4 className="font-serif font-medium text-slate-800 mb-3">Industry Context</h4>
-										<p className="text-slate-600">{clause.industryComparison}</p>
-									</div>
-								</div>
-
-								{clause.recommendations && clause.recommendations.length > 0 && (
-									<div className="mt-6 pt-6 border-t border-slate-200">
-										<h4 className="font-serif font-medium text-slate-800 mb-3">Recommendations</h4>
-										<ul className="list-disc pl-5 space-y-2">
-											{clause.recommendations.map((rec, i) => (
-												<li key={i} className="text-slate-600">
-													{rec}
-												</li>
-											))}
-										</ul>
-									</div>
-								)}
 							</div>
-						))}
-					</div>
-				) : (
-					<p className="text-center text-slate-500 py-8">
-						No detailed clause analysis available.
-					</p>
-				)}
+							<div className="bg-slate-50 p-4 rounded-lg mb-4">
+								<p className="font-mono text-sm text-slate-700">
+									{clause.text}
+								</p>
+							</div>
+							<p className="text-slate-600 mb-4">{clause.analysis}</p>
+							
+							{/* Legal Precedents */}
+							{clause.legalPrecedents && clause.legalPrecedents.length > 0 && (
+								<div className="mb-4">
+									<h5 className="font-medium text-slate-700 mb-2">Legal Precedents</h5>
+									<div className="space-y-2">
+										{clause.legalPrecedents.map((precedent, idx) => (
+											<div key={idx} className="bg-blue-50 p-3 rounded">
+												<div className="font-medium text-blue-800">{precedent.case}</div>
+												<div className="text-sm text-blue-600">{precedent.relevance}</div>
+												<div className="text-sm text-slate-600">{precedent.implication}</div>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Bias indicators */}
+							<div className="mb-4">
+								<h5 className="font-medium text-slate-700 mb-2">
+									Bias Indicators
+								</h5>
+								<div className="space-y-2">
+									{clause.biasIndicators.map((indicator, idx) => (
+										<div key={idx} className="flex items-center justify-between">
+											<span className="text-sm text-slate-600">
+												{indicator.label}
+											</span>
+											<ProgressBar
+												value={indicator.value}
+												color={idx === 0 ? 'bg-rose-700' : idx === 1 ? 'bg-slate-700' : 'bg-slate-500'}
+												label={indicator.label}
+											/>
+										</div>
+									))}
+								</div>
+							</div>
+
+							{/* Industry comparison */}
+							<div className="mb-4">
+								<h5 className="font-medium text-slate-700 mb-2">
+									Industry Comparison
+								</h5>
+								<p className="text-sm text-slate-600">
+									{clause.industryComparison}
+								</p>
+							</div>
+
+							{/* Recommendations */}
+							<div>
+								<h5 className="font-medium text-slate-700 mb-2">
+									Recommendations
+								</h5>
+								<ul className="list-disc list-inside space-y-1">
+									{clause.recommendations.map((rec, idx) => (
+										<li key={idx} className="text-sm text-slate-600">
+											{rec}
+										</li>
+									))}
+								</ul>
+							</div>
+						</div>
+					))}
+				</div>
 			</div>
 
 			<div className="legal-card mb-12">
@@ -553,7 +576,7 @@ export default function ContractSentimentPage() {
 					<h3 className="font-serif font-bold text-slate-800 mb-3">Overall Risk Assessment</h3>
 					<div className="flex items-center gap-3 mb-4">
 						<SentimentBadge
-							type={analysis.summary?.riskAssessment?.level as SentimentType}
+							type={(analysis.summary?.riskAssessment?.level?.toLowerCase() as SentimentType) || "neutral"}
 							label={analysis.summary?.riskAssessment?.label || 'Not Available'}
 						/>
 					</div>
@@ -562,6 +585,102 @@ export default function ContractSentimentPage() {
 					</p>
 				</div>
 			</div>
+
+			{/* Legal References Section */}
+			{analysis.legalReferences && analysis.legalReferences.length > 0 && (
+				<div className="legal-card mb-8">
+					<h3 className="text-lg font-serif font-bold text-slate-700 mb-4">
+						Legal References
+					</h3>
+					<div className="space-y-4">
+						{analysis.legalReferences.map((ref, index) => (
+							<div key={index} className="border-l-4 border-blue-500 pl-4">
+								<h4 className="font-medium text-slate-800">
+									{ref.title}
+								</h4>
+								<p className="text-slate-600 text-sm mb-2">
+									{ref.description}
+								</p>
+								{ref.url && (
+									<a
+										href={ref.url.startsWith('http') ? ref.url : `https://${ref.url.replace(/^\/+/, '')}`}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center"
+									>
+										<svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+										</svg>
+										{ref.url.length > 50 ? `${ref.url.substring(0, 47)}...` : ref.url}
+									</a>
+								)}
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* Industry Standards Section */}
+			{analysis.industryStandards && analysis.industryStandards.length > 0 && (
+				<div className="legal-card mb-8">
+					<h3 className="text-lg font-serif font-bold text-slate-700 mb-4">
+						Industry Standards
+					</h3>
+					<div className="space-y-4">
+						{analysis.industryStandards.map((standard, index) => (
+							<div key={index} className="flex items-start space-x-4">
+								<div className={`px-3 py-1 rounded-full text-sm ${
+									standard.complianceStatus === 'Compliant' 
+										? 'bg-green-100 text-green-800'
+										: standard.complianceStatus === 'Non-Compliant'
+										? 'bg-red-100 text-red-800'
+										: 'bg-yellow-100 text-yellow-800'
+								}`}>
+									{standard.complianceStatus}
+								</div>
+								<div>
+									<h4 className="font-medium text-slate-800">
+										{standard.name}
+									</h4>
+									<p className="text-slate-600 text-sm">
+										{standard.description}
+									</p>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* Regulatory Guidelines Section */}
+			{analysis.regulatoryGuidelines && analysis.regulatoryGuidelines.length > 0 && (
+				<div className="legal-card mb-8">
+					<h3 className="text-lg font-serif font-bold text-slate-700 mb-4">
+						Regulatory Guidelines
+					</h3>
+					<div className="space-y-4">
+						{analysis.regulatoryGuidelines.map((guideline, index) => (
+							<div key={index} className="border-l-4 border-purple-500 pl-4">
+								<h4 className="font-medium text-slate-800">
+									{guideline.regulation}
+								</h4>
+								<p className="text-slate-600 text-sm mb-2">
+									{guideline.relevance}
+								</p>
+								<div className={`inline-block px-3 py-1 rounded-full text-sm ${
+									guideline.complianceStatus === 'Compliant'
+										? 'bg-green-100 text-green-800'
+										: guideline.complianceStatus === 'Non-Compliant'
+										? 'bg-red-100 text-red-800'
+										: 'bg-yellow-100 text-yellow-800'
+								}`}>
+									{guideline.complianceStatus}
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
