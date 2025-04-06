@@ -1,0 +1,10 @@
+data/
+.env
+*.pdf
+*.txt
+*.json
+*.csv
+*.zip
+__pycache__/
+model_cache/
+.DS_Store
