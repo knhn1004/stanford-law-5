@@ -8,6 +8,10 @@ import {
 	ContractAnalysis,
 } from '../services/contractAnalysis';
 import Link from 'next/link';
+import {
+	PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar,
+	XAxis, YAxis, CartesianGrid, Tooltip, Legend
+} from 'recharts';
 
 export default function ContractSentimentPage() {
 	const [analysis, setAnalysis] = useState<ContractAnalysis | null>(null);
@@ -262,10 +266,31 @@ export default function ContractSentimentPage() {
 					Sentiment Distribution by Clause Type
 				</h2>
 				<div className="h-80 mb-4">
-					{/* Chart visualization - in a real app you would use a chart library like Chart.js, Recharts, etc. */}
-					<div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
-						<p className="text-gray-500">Sentiment Distribution Chart</p>
-					</div>
+					<ResponsiveContainer width="100%" height="100%">
+						<PieChart>
+							<Pie
+								data={[
+									{ name: 'Vendor-favorable', value: analysis.sentimentDistribution.vendorFavorable },
+									{ name: 'Balanced', value: analysis.sentimentDistribution.balanced },
+									{ name: 'Customer-favorable', value: analysis.sentimentDistribution.customerFavorable },
+									{ name: 'Neutral', value: analysis.sentimentDistribution.neutral }
+								]}
+								cx="50%"
+								cy="50%"
+								labelLine={false}
+								outerRadius={150}
+								fill="#8884d8"
+								dataKey="value"
+								label={({ name, value }) => `${name}: ${value}%`}
+							>
+								<Cell fill="#EF4444" />
+								<Cell fill="#10B981" />
+								<Cell fill="#3B82F6" />
+								<Cell fill="#6B7280" />
+							</Pie>
+							<Tooltip />
+						</PieChart>
+					</ResponsiveContainer>
 				</div>
 				<div className="flex flex-wrap justify-center gap-4">
 					<div className="flex items-center gap-2">
@@ -462,10 +487,41 @@ export default function ContractSentimentPage() {
 					Industry Benchmarking
 				</h2>
 				<div className="h-96 mb-4">
-					{/* Placeholder for chart - would use a charting library in production */}
-					<div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
-						<p className="text-gray-500">Industry Comparison Chart</p>
-					</div>
+					<ResponsiveContainer width="100%" height="100%">
+						<BarChart
+							data={[
+								{
+									category: 'Overall Fairness',
+									current: analysis.metrics.overallFairnessScore,
+									industry: 7.5
+								},
+								{
+									category: 'Bias Indicators',
+									current: analysis.metrics.potentialBiasIndicators,
+									industry: 3
+								},
+								{
+									category: 'Risk Clauses',
+									current: analysis.metrics.highRiskClauses,
+									industry: 2
+								},
+								{
+									category: 'Balanced Clauses',
+									current: analysis.metrics.balancedClauses,
+									industry: 8
+								}
+							]}
+							margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+						>
+							<CartesianGrid strokeDasharray="3 3" />
+							<XAxis dataKey="category" />
+							<YAxis />
+							<Tooltip />
+							<Legend />
+							<Bar dataKey="current" name="Your Contract" fill="#3B82F6" />
+							<Bar dataKey="industry" name="Industry Average" fill="#6B7280" />
+						</BarChart>
+					</ResponsiveContainer>
 				</div>
 				<p>{analysis.industryBenchmarking.summary}</p>
 			</div>
