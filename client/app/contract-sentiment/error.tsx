@@ -21,6 +21,9 @@ export default function Error({
         <p className="mb-4">
           Something went wrong while loading the contract analysis.
         </p>
+        <p className="mb-4 text-red-500 text-sm font-mono border p-2 bg-gray-50 overflow-auto">
+          {error.message}
+        </p>
         <div className="flex justify-center gap-4">
           <button
             onClick={reset}

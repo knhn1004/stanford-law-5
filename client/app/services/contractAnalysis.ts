@@ -1,168 +1,383 @@
 // Mock data for contract analysis
-const mockContractAnalysis = {
-  id: 'mock-analysis-123',
-  timestamp: new Date().toISOString(),
-  contractName: 'Software License Agreement: SaaSCo - Enterprise Edition',
-  description: 'This analysis examines the SaaSCo Enterprise License Agreement (v3.2) for sentiment, bias, and risk factors.',
-  metrics: {
-    overallFairnessScore: 68,
-    potentialBiasIndicators: 12,
-    highRiskClauses: 4,
-    balancedClauses: 8
-  },
-  sentimentDistribution: {
-    vendorFavorable: 45,
-    balanced: 30,
-    customerFavorable: 15,
-    neutral: 10
-  },
-  notableClauses: [
-    {
-      type: 'Limitation of Liability',
-      sentiment: 'biased-seller',
-      sentimentLabel: 'Vendor-favorable',
-      biasScore: 87,
-      riskLevel: 'negative',
-      riskLabel: 'High',
-      text: 'IN NO EVENT SHALL VENDOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. VENDOR\'S TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNTS PAID BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM.',
-      analysis: 'This clause is heavily vendor-favorable with several concerning elements:',
-      biasIndicators: [
-        { label: 'Vendor Protection', value: 95 },
-        { label: 'Customer Protection', value: 15 },
-        { label: 'Negotiability', value: 22 }
-      ],
-      industryComparison: 'This limitation of liability clause is more restrictive than 78% of similar SaaS contracts in our database. Most enterprise SaaS agreements exclude liability for indirect damages but include exceptions for data breaches, IP infringement, and violations of confidentiality.',
-      recommendations: [
-        'Add exceptions for breach of confidentiality, data protection obligations, and intellectual property indemnification',
-        'Increase liability cap to at least 24 months of fees',
-        'Add mutual limitations on liability for both parties'
-      ]
-    },
-    {
-      type: 'Termination',
-      sentiment: 'biased-seller',
-      sentimentLabel: 'Vendor-favorable',
-      biasScore: 72,
-      riskLevel: 'negative',
-      riskLabel: 'High',
-      text: 'Vendor may terminate this Agreement immediately upon written notice if Customer: (a) fails to pay any fees when due; (b) breaches any term of this Agreement; or (c) becomes insolvent or files for bankruptcy. Customer may terminate this Agreement for material breach by Vendor only if Vendor fails to cure such breach within 30 days of written notice.',
-      analysis: 'This clause demonstrates significant imbalance between the parties\' termination rights:',
-      biasIndicators: [
-        { label: 'Vendor Protection', value: 85 },
-        { label: 'Customer Protection', value: 35 },
-        { label: 'Negotiability', value: 40 }
-      ],
-      industryComparison: 'This termination clause is more restrictive than 65% of similar SaaS contracts in our database. Most enterprise SaaS agreements provide reciprocal termination rights with similar cure periods for both parties.',
-      recommendations: [
-        'Make cure periods reciprocal for both parties (30 days)',
-        'Limit immediate termination to material breaches only',
-        'For payment issues, require notice and a 15-day cure period',
-        'Add customer right to terminate for convenience with 30-day notice'
-      ]
-    },
-    {
-      type: 'Indemnification',
-      sentiment: 'biased-seller',
-      sentimentLabel: 'Vendor-favorable',
-      biasScore: 65,
-      riskLevel: 'negative',
-      riskLabel: 'Medium',
-      text: 'Customer shall indemnify, defend, and hold harmless Vendor from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys\' fees) arising out of or relating to Customer\'s use of the Software or breach of this Agreement.',
-      analysis: 'This indemnification clause is one-sided, requiring the customer to indemnify the vendor but not vice versa.',
-      biasIndicators: [
-        { label: 'Vendor Protection', value: 75 },
-        { label: 'Customer Protection', value: 25 },
-        { label: 'Negotiability', value: 50 }
-      ],
-      industryComparison: 'This indemnification clause is more restrictive than 60% of similar SaaS contracts in our database. Most enterprise SaaS agreements include mutual indemnification provisions.',
-      recommendations: [
-        'Add mutual indemnification for both parties',
-        'Limit customer indemnification to claims arising from customer\'s breach',
-        'Add vendor indemnification for claims related to the software\'s infringement of third-party intellectual property rights'
-      ]
-    },
-    {
-      type: 'Payment Terms',
-      sentiment: 'neutral',
-      sentimentLabel: 'Neutral',
-      biasScore: 42,
-      riskLevel: 'neutral',
-      riskLabel: 'Low',
-      text: 'Customer shall pay all fees in accordance with the pricing set forth in the Order Form. All payments are non-refundable and non-cancelable except as expressly set forth in this Agreement.',
-      analysis: 'This payment terms clause is relatively balanced, with standard terms for SaaS agreements.',
-      biasIndicators: [
-        { label: 'Vendor Protection', value: 60 },
-        { label: 'Customer Protection', value: 40 },
-        { label: 'Negotiability', value: 55 }
-      ],
-      industryComparison: 'This payment terms clause is consistent with industry standards for SaaS agreements.',
-      recommendations: [
-        'Consider adding proration for unused portions of prepaid fees upon termination',
-        'Add clarity on payment methods and currency'
-      ]
-    },
-    {
-      type: 'Data Protection',
-      sentiment: 'biased-buyer',
-      sentimentLabel: 'Customer-favorable',
-      biasScore: 68,
-      riskLevel: 'positive',
-      riskLabel: 'Low',
-      text: 'Vendor shall implement appropriate technical and organizational measures to protect Customer Data against unauthorized or unlawful processing, accidental loss, destruction, or damage. Vendor shall notify Customer without undue delay upon becoming aware of a Personal Data Breach.',
-      analysis: 'This data protection clause provides strong protections for customer data.',
-      biasIndicators: [
-        { label: 'Vendor Protection', value: 30 },
-        { label: 'Customer Protection', value: 70 },
-        { label: 'Negotiability', value: 60 }
-      ],
-      industryComparison: 'This data protection clause is more protective than 75% of similar SaaS contracts in our database.',
-      recommendations: [
-        'Add specific timeframes for breach notification (e.g., within 72 hours)',
-        'Include requirements for regular security audits'
-      ]
-    }
-  ],
-  industryBenchmarking: {
-    fairnessScore: 68,
-    percentile: 40,
-    summary: 'This contract has a fairness score of 68/100, which places it in the bottom 40% of analyzed SaaS agreements in the enterprise software sector. The most significant deviations from industry norms are in the limitation of liability, termination rights, and service level agreement clauses.'
-  },
-  summary: {
-    title: 'Summary and Recommendations',
-    description: 'This Software License Agreement significantly favors the vendor across multiple key provisions. The most concerning areas are:',
-    points: [
-      {
-        title: 'Limitation of Liability',
-        description: 'Extremely vendor-favorable with a low cap and broad exclusions'
-      },
-      {
-        title: 'Termination Rights',
-        description: 'Unbalanced in favor of the vendor with immediate termination rights'
-      },
-      {
-        title: 'Indemnification',
-        description: 'One-sided protection for the vendor with limited reciprocal coverage'
-      },
-      {
-        title: 'Warranty',
-        description: 'Minimal warranties with extensive disclaimers'
-      }
-    ],
-    riskAssessment: {
-      level: 'negative',
-      label: 'High Risk',
-      description: 'This contract presents High Risk due to the imbalanced terms and significant customer exposure. We recommend prioritizing negotiation of the highlighted clauses to achieve more balanced terms.'
-    }
-  }
-};
+// Removed unused mock data
+
+// Define types for contract analysis data
+export interface BiasIndicator {
+	label: string;
+	value: number;
+}
+
+export interface NotableClause {
+	type: string;
+	sentiment:
+		| 'positive'
+		| 'negative'
+		| 'neutral'
+		| 'biased-buyer'
+		| 'biased-seller';
+	sentimentLabel: string;
+	biasScore: number;
+	riskLevel:
+		| 'positive'
+		| 'negative'
+		| 'neutral'
+		| 'biased-buyer'
+		| 'biased-seller';
+	riskLabel: string;
+	text: string;
+	analysis: string;
+	biasIndicators: BiasIndicator[];
+	industryComparison: string;
+	recommendations: string[];
+}
+
+export interface SummaryPoint {
+	title: string;
+	description: string;
+}
+
+export interface ContractAnalysis {
+	id: string;
+	timestamp: string;
+	contractName: string;
+	description: string;
+	metrics: {
+		overallFairnessScore: number;
+		potentialBiasIndicators: number;
+		highRiskClauses: number;
+		balancedClauses: number;
+	};
+	sentimentDistribution: {
+		vendorFavorable: number;
+		balanced: number;
+		customerFavorable: number;
+		neutral: number;
+	};
+	notableClauses: NotableClause[];
+	industryBenchmarking: {
+		fairnessScore: number;
+		percentile: number;
+		summary: string;
+	};
+	summary: {
+		title: string;
+		description: string;
+		points: SummaryPoint[];
+		riskAssessment: {
+			level: string;
+			label: string;
+			description: string;
+		};
+	};
+}
+
+// Function to upload a contract to FastAPI server
+export async function uploadContract(file: File) {
+	try {
+		const formData = new FormData();
+		formData.append('file', file);
+
+		const response = await fetch('http://localhost:8000/upload', {
+			method: 'POST',
+			body: formData,
+		});
+
+		if (!response.ok) {
+			throw new Error(`Error uploading contract: ${response.statusText}`);
+		}
+
+		const data = await response.json();
+		return data.doc_id;
+	} catch (error) {
+		console.error('Error uploading contract:', error);
+		throw error;
+	}
+}
+
+// Function to generate analysis using RAG with Ollama
+export async function generateAnalysis(docId: string) {
+	try {
+		const response = await fetch('http://localhost:8000/query', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				query: `Analyze this contract for sentiment, bias, and fairness. 
+    Focus on identifying vendor-favorable vs customer-favorable clauses.
+    Provide an overall fairness score out of 100, risk assessment, and recommendations.`,
+				doc_id: docId,
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error(`Error generating analysis: ${response.statusText}`);
+		}
+
+		const responseData = await response.json();
+
+		try {
+			// The response should already be valid JSON from the server
+			const parsedResponse = JSON.parse(responseData.response);
+			
+			// Create the analysis data from the parsed response
+			const analysisData = {
+				id: docId,
+				timestamp: new Date().toISOString(),
+				contractName: parsedResponse.contractName || `Contract ${docId}`,
+				description: typeof parsedResponse.description === 'string' 
+					? parsedResponse.description 
+					: 'Analysis of the contract',
+				metrics: parsedResponse.metrics || {
+					overallFairnessScore: 50,
+					potentialBiasIndicators: 0,
+					highRiskClauses: 0,
+					balancedClauses: 0,
+				},
+				sentimentDistribution: parsedResponse.sentimentDistribution || {
+					vendorFavorable: 25,
+					balanced: 25,
+					customerFavorable: 25,
+					neutral: 25,
+				},
+				notableClauses: Array.isArray(parsedResponse.notableClauses) 
+					? parsedResponse.notableClauses.map(clause => ({
+						...clause,
+						text: typeof clause.text === 'string' ? clause.text : 'Contract clause text unavailable',
+						analysis: typeof clause.analysis === 'string' ? clause.analysis : clause.analysis,
+						industryComparison: typeof clause.industryComparison === 'string' ? clause.industryComparison : clause.industryComparison,
+						recommendations: Array.isArray(clause.recommendations)
+							? clause.recommendations
+							: [],
+					}))
+					: [],
+				industryBenchmarking: {
+					fairnessScore: parsedResponse.metrics?.overallFairnessScore || 50,
+					percentile: 50,
+					summary: typeof parsedResponse.summary?.description === 'string' 
+						? parsedResponse.summary.description.substring(0, 200) 
+						: 'Analysis based on contract content.',
+				},
+				summary: {
+					title: parsedResponse.summary?.title || 'Analysis Summary',
+					description: typeof parsedResponse.summary?.description === 'string'
+						? parsedResponse.summary.description
+						: 'Contract analysis summary',
+					points: Array.isArray(parsedResponse.summary?.points)
+						? parsedResponse.summary.points.map(point => ({
+							title: point.title || '',
+							description: typeof point.description === 'string' ? point.description : '',
+						}))
+						: [],
+					riskAssessment: parsedResponse.summary?.riskAssessment || {
+						level: 'neutral',
+						label: 'Medium Risk',
+						description: 'Risk assessment based on contract analysis.',
+					},
+				},
+			};
+
+			// Store the analysis data in localStorage for later retrieval
+			localStorage.setItem(
+				`contractAnalysis_${docId}`,
+				JSON.stringify(analysisData)
+			);
+
+			return analysisData;
+		} catch (error) {
+			console.error('Error parsing analysis response:', error);
+			// Return a default analysis structure
+			const defaultAnalysis = {
+				id: docId,
+				timestamp: new Date().toISOString(),
+				contractName: `Contract ${docId}`,
+				description: 'Error processing contract analysis.',
+				metrics: {
+					overallFairnessScore: 50,
+					potentialBiasIndicators: 0,
+					highRiskClauses: 0,
+					balancedClauses: 0,
+				},
+				sentimentDistribution: {
+					vendorFavorable: 25,
+					balanced: 25,
+					customerFavorable: 25,
+					neutral: 25,
+				},
+				notableClauses: [],
+				industryBenchmarking: {
+					fairnessScore: 50,
+					percentile: 50,
+					summary: 'Analysis failed due to technical issues.',
+				},
+				summary: {
+					title: 'Analysis Error',
+					description: 'An error occurred while analyzing the contract.',
+					points: [],
+					riskAssessment: {
+						level: 'neutral',
+						label: 'Unknown',
+						description: 'Analysis failed due to technical issues.',
+					},
+				},
+			};
+
+			localStorage.setItem(
+				`contractAnalysis_${docId}`,
+				JSON.stringify(defaultAnalysis)
+			);
+
+			return defaultAnalysis;
+		}
+	} catch (error) {
+		console.error('Error generating analysis:', error);
+		throw error;
+	}
+}
 
 // Function to fetch contract analysis data
 export async function getContractAnalysis(analysisId: string) {
-  // In a real implementation, this would fetch data from the FastAPI backend
-  // For now, we'll just return the mock data after a delay to simulate network latency
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockContractAnalysis);
-    }, 1000);
-  });
-} 
+	try {
+		// Check if we have cached analysis data
+		const cachedAnalysis = localStorage.getItem(
+			`contractAnalysis_${analysisId}`
+		);
+		console.log('cachedAnalysis', JSON.parse(cachedAnalysis));
+
+		if (cachedAnalysis) {
+			// Parse the cached data
+			const parsedData = JSON.parse(cachedAnalysis);
+
+			// Clean up any unexpected content
+			return cleanAnalysisData(parsedData);
+		}
+
+		// If no cached data exists, try to regenerate the analysis
+		console.log('No cached analysis found, regenerating...');
+		
+		// Call the FastAPI endpoint to regenerate the analysis
+		const response = await fetch('http://localhost:8000/query', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				query: `Analyze this contract for sentiment, bias, and fairness. 
+    Focus on identifying vendor-favorable vs customer-favorable clauses.
+    Provide an overall fairness score out of 100, risk assessment, and recommendations.`,
+				doc_id: analysisId,
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error(`Error regenerating analysis: ${response.statusText}`);
+		}
+
+		const responseData = await response.json();
+		const parsedResponse = JSON.parse(responseData.response);
+		
+		// Store the regenerated analysis in localStorage
+		localStorage.setItem(
+			`contractAnalysis_${analysisId}`,
+			JSON.stringify(parsedResponse)
+		);
+
+		return cleanAnalysisData(parsedResponse);
+	} catch (error) {
+		console.error('Error fetching analysis:', error);
+		throw error;
+	}
+}
+
+// Helper function to clean analysis data
+function cleanAnalysisData(data: ContractAnalysis): ContractAnalysis {
+	// Helper to clean text fields and remove JSON syntax
+	const cleanText = (text: string): string => {
+		if (!text) return '';
+
+		// Remove JSON-like content
+		return text
+			.replace(/```json[\s\S]*?```/g, '')
+			.replace(/```[\s\S]*?```/g, '')
+			.replace(/```/g, '')
+			.replace(/\{\s*"contractName"[\s\S]*?\}/g, '')
+			.replace(/\{\s*"[\w]+"[\s\S]*?\}/g, '')
+			.replace(/\\"/g, '"')
+			.replace(/\\\\/g, '\\')
+			.trim();
+	};
+
+	// Create a deep copy to avoid modifying the original
+	const cleanData = { ...data };
+
+	// Clean description
+	if (typeof cleanData.description === 'string') {
+		cleanData.description = cleanText(cleanData.description);
+	}
+
+	// Clean summary
+	if (cleanData.summary) {
+		if (typeof cleanData.summary.description === 'string') {
+			cleanData.summary.description = cleanText(cleanData.summary.description);
+		}
+
+		if (cleanData.summary.points && Array.isArray(cleanData.summary.points)) {
+			cleanData.summary.points = cleanData.summary.points.map(point => ({
+				...point,
+				title:
+					typeof point.title === 'string'
+						? cleanText(point.title)
+						: point.title,
+				description:
+					typeof point.description === 'string'
+						? cleanText(point.description)
+						: point.description,
+			}));
+		}
+
+		if (
+			cleanData.summary.riskAssessment &&
+			typeof cleanData.summary.riskAssessment.description === 'string'
+		) {
+			cleanData.summary.riskAssessment.description = cleanText(
+				cleanData.summary.riskAssessment.description
+			);
+		}
+	}
+
+	// Clean notable clauses
+	if (cleanData.notableClauses && Array.isArray(cleanData.notableClauses)) {
+		cleanData.notableClauses = cleanData.notableClauses.map(clause => ({
+			...clause,
+			text:
+				typeof clause.text === 'string'
+					? cleanText(clause.text)
+					: 'Contract clause text unavailable',
+			analysis:
+				typeof clause.analysis === 'string'
+					? cleanText(clause.analysis)
+					: clause.analysis,
+			industryComparison:
+				typeof clause.industryComparison === 'string'
+					? cleanText(clause.industryComparison)
+					: clause.industryComparison,
+			recommendations: Array.isArray(clause.recommendations)
+				? clause.recommendations.map(rec =>
+						typeof rec === 'string' ? cleanText(rec) : rec
+				  )
+				: clause.recommendations,
+		}));
+	}
+
+	// Clean industry benchmarking
+	if (
+		cleanData.industryBenchmarking &&
+		typeof cleanData.industryBenchmarking.summary === 'string'
+	) {
+		cleanData.industryBenchmarking.summary = cleanText(
+			cleanData.industryBenchmarking.summary
+		);
+	}
+
+	return cleanData;
+}

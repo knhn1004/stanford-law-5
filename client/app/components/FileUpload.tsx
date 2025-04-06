@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { uploadContract, generateAnalysis } from "../services/contractAnalysis";
 
 export default function FileUpload() {
   const [isDragging, setIsDragging] = useState(false);
@@ -55,23 +56,17 @@ export default function FileUpload() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // Send the file to the backend
-      const response = await fetch("/api/analyze-contract", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to analyze contract");
-      }
-
-      const data = await response.json();
-
-      // Store the analysis ID in localStorage for retrieval on the analysis page
-      localStorage.setItem("contractAnalysisId", data.analysisId);
+      // 1. Upload the contract to FastAPI server and get doc_id
+      const docId = await uploadContract(file);
+      
+      // Store the doc_id in localStorage
+      localStorage.setItem("contractDocId", docId);
+      
+      // 2. Generate sentiment analysis using RAG with Ollama
+      await generateAnalysis(docId);
+      
+      // Store the analysis ID (same as doc_id for simplicity)
+      localStorage.setItem("contractAnalysisId", docId);
 
       // Redirect to the contract sentiment page
       router.push("/contract-sentiment");
@@ -90,7 +85,6 @@ export default function FileUpload() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={handleClick}
       >
         <div className="flex flex-col items-center justify-center">
           <svg
@@ -107,9 +101,15 @@ export default function FileUpload() {
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
             />
           </svg>
-          <p className="mb-2 text-sm text-gray-500">
-            <span className="font-medium">Click to upload</span> or drag and
-            drop
+          <button 
+            onClick={handleClick}
+            disabled={isUploading}
+            className="mb-2 font-medium text-blue-600 hover:text-blue-800 focus:outline-none disabled:opacity-50"
+          >
+            Click to upload
+          </button>
+          <p className="text-sm text-gray-500">
+            or drag and drop
           </p>
           <p className="text-xs text-gray-500">PDF files only</p>
           {isUploading && (

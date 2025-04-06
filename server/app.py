@@ -10,7 +10,6 @@ from llama_index.core import (
     Settings,
 )
 from llama_index.core.node_parser import SimpleNodeParser
-from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.readers.file import PDFReader
 from pypdf import PdfReader
@@ -20,6 +19,8 @@ import time
 import numpy as np
 import psycopg2
 import psycopg2.extras
+from groq import Groq
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +28,11 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Initialize Groq client
+groq_client = Groq(
+    api_key=os.getenv("GROQ_API_KEY"),
+)
 
 # Initialize FastAPI app
 app = FastAPI(title="Contract Analysis API")
@@ -132,9 +138,7 @@ class DirectVectorStore:
 
 
 # Initialize components
-llm = Ollama(model="llama2", request_timeout=120.0)
-
-# Initialize Ollama embedding model first
+# We'll keep Ollama for embeddings but use Groq for LLM
 embed_model = OllamaEmbedding(
     model_name="nomic-embed-text",
     base_url="http://localhost:11434",
@@ -149,7 +153,6 @@ embed_model = OllamaEmbedding(
 
 # Set the default embedding model
 Settings.embed_model = embed_model
-Settings.llm = llm
 Settings.chunk_size = 512
 Settings.chunk_overlap = 50
 Settings.num_output = 512  # Limit output size
@@ -409,10 +412,13 @@ def process_pdf(file_path: str, doc_id: str):
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     """Upload and process a PDF file."""
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-
     try:
+        # Validate using mimetype instead of file signature
+        if file.content_type != "application/pdf":
+            raise HTTPException(
+                status_code=400, detail="Invalid file type. Only PDF files are allowed."
+            )
+
         # Create a temporary file to store the upload
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             content = await file.read()
@@ -455,29 +461,162 @@ async def query_document(request: QueryRequest):
 
         if not results:
             return QueryResponse(
-                response="I couldn't find any relevant information to answer your query.",
+                response=json.dumps({
+                    "contractName": f"Contract {request.doc_id}",
+                    "description": "No relevant information found in the contract.",
+                    "metrics": {
+                        "overallFairnessScore": 50,
+                        "potentialBiasIndicators": 0,
+                        "highRiskClauses": 0,
+                        "balancedClauses": 0
+                    },
+                    "sentimentDistribution": {
+                        "vendorFavorable": 25,
+                        "balanced": 25,
+                        "customerFavorable": 25,
+                        "neutral": 25
+                    },
+                    "notableClauses": [],
+                    "summary": {
+                        "title": "Analysis Summary",
+                        "description": "No relevant contract sections found for analysis.",
+                        "points": [],
+                        "riskAssessment": {
+                            "level": "neutral",
+                            "label": "Unknown",
+                            "description": "Insufficient information for risk assessment."
+                        }
+                    }
+                }),
                 doc_id=request.doc_id,
             )
 
         # Extract the content from the most relevant results
         contexts = [result["content"] for result in results]
 
-        # Create a prompt with context for the LLM
-        prompt = f"""
-        Answer the following question based on the provided context. If the answer cannot be determined from the context, say so.
-        
-        Context:
-        {' '.join(contexts)}
-        
-        Question: {request.query}
-        
-        Answer:
-        """
+        # Create messages for Groq chat completion with structured output instruction
+        messages = [
+            {
+                "role": "system",
+                "content": """You are a contract analysis assistant that provides structured analysis of legal documents.
+                Your responses must be in valid JSON format following the exact schema provided.
+                Do not include any explanatory text or markdown formatting outside the JSON structure.
+                If you are unsure about any values, use reasonable defaults rather than omitting fields.
+                Ensure all string values are properly escaped and all numbers are valid."""
+            },
+            {
+                "role": "user",
+                "content": f"""Analyze the following contract text for sentiment, bias, and fairness.
+                Focus on identifying vendor-favorable vs customer-favorable clauses.
+                Provide an overall fairness score out of 100, risk assessment, and recommendations.
 
-        # Get response from LLM
-        response = llm.complete(prompt)
+                Contract text from relevant sections:
+                {' '.join(contexts)}
 
-        return QueryResponse(response=str(response.text), doc_id=request.doc_id)
+                Return your analysis in this exact JSON structure, with no additional text or formatting:
+                {{
+                  "contractName": string,
+                  "description": string,
+                  "metrics": {{
+                    "overallFairnessScore": number,
+                    "potentialBiasIndicators": number,
+                    "highRiskClauses": number,
+                    "balancedClauses": number
+                  }},
+                  "sentimentDistribution": {{
+                    "vendorFavorable": number,
+                    "balanced": number,
+                    "customerFavorable": number,
+                    "neutral": number
+                  }},
+                  "notableClauses": [
+                    {{
+                      "type": string,
+                      "sentiment": string,
+                      "sentimentLabel": string,
+                      "biasScore": number,
+                      "riskLevel": string,
+                      "riskLabel": string,
+                      "text": string,
+                      "analysis": string,
+                      "biasIndicators": [
+                        {{
+                          "label": string,
+                          "value": number
+                        }}
+                      ],
+                      "industryComparison": string,
+                      "recommendations": [string]
+                    }}
+                  ],
+                  "summary": {{
+                    "title": string,
+                    "description": string,
+                    "points": [
+                      {{
+                        "title": string,
+                        "description": string
+                      }}
+                    ],
+                    "riskAssessment": {{
+                      "level": string,
+                      "label": string,
+                      "description": string
+                    }}
+                  }}
+                }}"""
+            }
+        ]
+
+        # Get response from Groq
+        try:
+            completion = groq_client.chat.completions.create(
+                messages=messages,
+                model="llama-3.3-70b-versatile",
+                temperature=0.1,
+                max_tokens=2048,
+                response_format={"type": "json_object"}
+            )
+            
+            # Parse the response to ensure it's valid JSON and properly formatted
+            try:
+                response_json = json.loads(completion.choices[0].message.content)
+                response_text = json.dumps(response_json)  # Re-serialize to ensure proper formatting
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON from LLM: {str(e)}")
+                # Return a default response if JSON is invalid
+                response_text = json.dumps({
+                    "contractName": f"Contract {request.doc_id}",
+                    "description": "Error processing contract analysis.",
+                    "metrics": {
+                        "overallFairnessScore": 50,
+                        "potentialBiasIndicators": 0,
+                        "highRiskClauses": 0,
+                        "balancedClauses": 0
+                    },
+                    "sentimentDistribution": {
+                        "vendorFavorable": 25,
+                        "balanced": 25,
+                        "customerFavorable": 25,
+                        "neutral": 25
+                    },
+                    "notableClauses": [],
+                    "summary": {
+                        "title": "Analysis Error",
+                        "description": "An error occurred while analyzing the contract.",
+                        "points": [],
+                        "riskAssessment": {
+                            "level": "neutral",
+                            "label": "Unknown",
+                            "description": "Analysis failed due to technical issues."
+                        }
+                    }
+                })
+        except Exception as e:
+            logger.error(f"Error getting completion from Groq: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to get response from LLM")
+
+        return QueryResponse(response=response_text, doc_id=request.doc_id)
 
     except Exception as e:
         logger.error(f"Error in query_document: {str(e)}")
