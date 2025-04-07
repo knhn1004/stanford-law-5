@@ -25,7 +25,12 @@ import requests
 import html
 import re
 from duckduckgo_search import DDGS
-from google.genai.types import GenerationConfig
+from google.genai.types import (
+    GenerationConfig,
+    Tool,
+    GenerateContentConfig,
+    GoogleSearch,
+)
 import enum
 
 # Set up logging
@@ -35,11 +40,13 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
+
 # Define enums for contract analysis
 class SentimentLevel(enum.Enum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
     NEUTRAL = "neutral"
+
 
 class RiskLevel(enum.Enum):
     HIGH = "high"
@@ -47,15 +54,18 @@ class RiskLevel(enum.Enum):
     LOW = "low"
     NEUTRAL = "neutral"
 
+
 # Define Pydantic models for structured output
 class BiasIndicator(BaseModel):
     label: str
     value: float
 
+
 class LegalPrecedent(BaseModel):
     case: str
     relevance: str
     implication: str
+
 
 class NotableClause(BaseModel):
     type: str
@@ -71,14 +81,17 @@ class NotableClause(BaseModel):
     recommendations: List[str]
     legalPrecedents: List[LegalPrecedent]
 
+
 class SummaryPoint(BaseModel):
     title: str
     description: str
+
 
 class RiskAssessment(BaseModel):
     level: str
     label: RiskLevel
     description: str
+
 
 class Summary(BaseModel):
     title: str
@@ -86,15 +99,18 @@ class Summary(BaseModel):
     points: List[SummaryPoint]
     riskAssessment: RiskAssessment
 
+
 class IndustryStandard(BaseModel):
     name: str
     description: str
     complianceStatus: str
 
+
 class RegulatoryGuideline(BaseModel):
     regulation: str
     relevance: str
     complianceStatus: str
+
 
 class Metrics(BaseModel):
     overallFairnessScore: float
@@ -102,11 +118,23 @@ class Metrics(BaseModel):
     highRiskClauses: int
     balancedClauses: int
 
+
 class SentimentDistribution(BaseModel):
     vendorFavorable: float
     balanced: float
     customerFavorable: float
     neutral: float
+
+
+class LegalReference(BaseModel):
+    """Legal reference from DuckDuckGo search."""
+
+    title: str
+    description: str
+    url: str
+    source: str
+    type: str
+
 
 class ContractAnalysis(BaseModel):
     contractName: str
@@ -117,6 +145,8 @@ class ContractAnalysis(BaseModel):
     summary: Summary
     industryStandards: List[IndustryStandard]
     regulatoryGuidelines: List[RegulatoryGuideline]
+    legalReferences: List[LegalReference]
+
 
 # Initialize Gemini
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -530,42 +560,209 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Search functions for legal information
-def get_legal_info(topic):
-    """Get information about a legal topic using DuckDuckGo search."""
+def generate_search_keywords(contract_text):
+    """Use Gemini to generate relevant search keywords from contract text."""
     try:
-        # Extract key terms for better search results
-        key_terms = extract_legal_key_terms(topic)
-        search_query = f"contract law {key_terms} legal precedent case law"
+        # Truncate contract text if too long
+        max_length = 5000
+        if len(contract_text) > max_length:
+            contract_text = contract_text[:max_length] + "..."
 
-        # Use DuckDuckGo search
-        logger.info(f"Searching for legal references with terms: {search_query}")
-        with DDGS() as ddgs:
-            search_results = list(
-                ddgs.text(
-                    search_query,
-                    region="wt-wt",  # Worldwide results
-                    max_results=5,  # Limit to 5 results
-                )
+        prompt = """Based on this contract text, generate 5 specific legal search queries.
+        Each query should focus on finding relevant legal precedents, case law, or legal analysis.
+        
+        For example, if the contract mentions software licensing, generate queries like:
+        - "software license agreement legal precedents"
+        - "intellectual property licensing case law"
+        - "software contract breach cases"
+        
+        Contract text:
+        {text}
+        
+        Generate 5 specific search queries, focusing on the key legal concepts in this contract.
+        Format each query as a plain text string, one per line.
+        """.format(
+            text=contract_text
+        )
+
+        # Get keywords from Gemini
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001", contents=prompt
+        )
+
+        # Split response into lines and clean up
+        search_terms = []
+        for line in response.text.split("\n"):
+            line = line.strip()
+            # Remove bullet points, quotes, and other formatting
+            line = line.lstrip("•-*\"' ").rstrip("\"' ")
+            if line and not line.startswith(("Format", "Generate", "Based on")):
+                search_terms.append(line + " legal precedent case law")
+
+        logger.info(f"Generated search terms: {search_terms}")
+        return search_terms
+
+    except Exception as e:
+        logger.error(f"Error generating search keywords: {str(e)}")
+        return ["contract law precedents", "legal contract analysis"]
+
+
+def get_legal_info(topic):
+    """Get information about a legal topic using Gemini's built-in Google Search."""
+    try:
+        # Configure Google Search as a tool exactly as in the docs
+        google_search_tool = Tool(google_search=GoogleSearch())
+
+        # Create a simple, focused prompt that encourages search use
+        prompt = f"""Find relevant legal precedents, case law, and analysis for this contract text.
+        
+        Contract text:
+        {topic}
+        
+        Search for and provide:
+        1. Recent court cases and legal precedents
+        2. Legal analysis articles
+        3. Industry standards
+        4. Similar contract disputes
+        
+        For each source, include:
+        - The title
+        - Why it's relevant
+        - Where it's from"""
+
+        # Generate content with search capability using the exact configuration from docs
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",  # Make sure to use the correct model
+            contents=prompt,
+            config=GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"],
+            ),
+        )
+
+        # Check if response is valid
+        if not response or not response.candidates or not response.candidates[0]:
+            logger.warning("Invalid response from Gemini")
+            return get_fallback_references()
+
+        # Get the response text
+        candidate = response.candidates[0]
+        if not candidate.content:
+            logger.warning("No content in response")
+            return get_fallback_references()
+
+        # Log the raw response for debugging
+        logger.info(f"Raw response: {candidate}")
+
+        # Extract grounding metadata
+        grounding_metadata = candidate.grounding_metadata
+        if not grounding_metadata:
+            logger.warning("No grounding metadata in response")
+            return get_fallback_references()
+
+        # Format the results using the grounding chunks
+        formatted_results = []
+        seen_urls = set()
+
+        if grounding_metadata.grounding_chunks:
+            logger.info(
+                f"Found {len(grounding_metadata.grounding_chunks)} grounding chunks"
             )
 
-        # Format the results
-        formatted_results = []
-        for result in search_results:
-            if result.get("link") and result.get("title"):
-                formatted_results.append({
-                    "title": result.get("title", "").strip(),
-                    "description": result.get("body", "").strip(),
-                    "url": result.get("link"),
-                    "source": "Legal Database Search",
-                    "type": "legal_reference"
-                })
+            for chunk in grounding_metadata.grounding_chunks:
+                if not chunk.web:
+                    continue
 
+                url = chunk.web.uri if hasattr(chunk.web, "uri") else None
+                if not url or url in seen_urls:
+                    continue
+
+                seen_urls.add(url)
+
+                # Get the grounding supports for this chunk
+                description = ""
+
+                # Try to get description from grounding supports first
+                if grounding_metadata.grounding_supports:
+                    relevant_texts = []
+                    for support in grounding_metadata.grounding_supports:
+                        if hasattr(support, "groundingChunkIndices"):
+                            chunk_index = grounding_metadata.grounding_chunks.index(
+                                chunk
+                            )
+                            if (
+                                chunk_index in support.groundingChunkIndices
+                                and support.segment.text
+                            ):
+                                relevant_texts.append(support.segment.text)
+                    if relevant_texts:
+                        description = " ".join(relevant_texts)
+
+                # Fallback to other sources if no grounding support
+                if not description:
+                    if hasattr(chunk.web, "snippet"):
+                        description = chunk.web.snippet
+                    elif hasattr(chunk, "segment") and hasattr(chunk.segment, "text"):
+                        description = chunk.segment.text
+                    else:
+                        description = "Legal analysis and precedents"
+
+                formatted_results.append(
+                    {
+                        "title": (
+                            chunk.web.title
+                            if hasattr(chunk.web, "title")
+                            else "Legal Reference"
+                        ),
+                        "description": description,
+                        "url": url,
+                        "source": "Legal Database Search",
+                        "type": "legal_reference",
+                    }
+                )
+
+        # Log search queries used
+        if hasattr(grounding_metadata, "webSearchQueries"):
+            logger.info(f"Search queries used: {grounding_metadata.webSearchQueries}")
+
+        # Add fallback references if we have too few results
+        if len(formatted_results) < 3:
+            logger.info("Adding fallback references")
+            formatted_results.extend(get_fallback_references())
+
+        logger.info(f"Found {len(formatted_results)} legal references")
         return formatted_results
 
     except Exception as e:
         logger.error(f"Error in legal information search: {str(e)}")
-        return []  # Return empty list on error
+        return get_fallback_references()
+
+
+def get_fallback_references():
+    """Return fallback legal references when search fails."""
+    return [
+        {
+            "title": "Contract Law Fundamentals",
+            "description": "Overview of basic contract law principles and precedents",
+            "url": "https://www.law.cornell.edu/wex/contract",
+            "source": "Legal Information Institute",
+            "type": "legal_reference",
+        },
+        {
+            "title": "Commercial Contract Case Law",
+            "description": "Collection of significant contract law cases and their implications",
+            "url": "https://www.law.cornell.edu/wex/commercial_law",
+            "source": "Legal Information Institute",
+            "type": "legal_reference",
+        },
+        {
+            "title": "Contract Interpretation Principles",
+            "description": "Legal principles and precedents for interpreting contract terms",
+            "url": "https://www.law.cornell.edu/wex/contract_interpretation",
+            "source": "Legal Information Institute",
+            "type": "legal_reference",
+        },
+    ]
 
 
 def extract_legal_key_terms(text, max_terms=3):
@@ -633,6 +830,38 @@ For each clause you analyze:
 Your analysis should be thorough, well-researched, and supported by concrete examples and references."""
 
 
+def softmax(x):
+    """Compute softmax values for each set of scores in x."""
+    # Ensure x is a numpy array and handle potential numerical instability
+    x = np.array(x, dtype=np.float64)
+    # Subtract the maximum value for numerical stability
+    x = x - np.max(x)
+    exp_x = np.exp(x)
+    return (exp_x / exp_x.sum()) * 100  # Multiply by 100 to get percentages
+
+
+def normalize_sentiment_distribution(sentiment_dist):
+    """Normalize sentiment distribution using softmax."""
+    # Extract values in a fixed order
+    values = [
+        sentiment_dist.get("vendorFavorable", 0.35),
+        sentiment_dist.get("balanced", 0.4),
+        sentiment_dist.get("customerFavorable", 0.15),
+        sentiment_dist.get("neutral", 0.1),
+    ]
+
+    # Apply softmax normalization
+    normalized = softmax(values)
+
+    # Return normalized values in a dictionary
+    return {
+        "vendorFavorable": round(float(normalized[0]), 2),
+        "balanced": round(float(normalized[1]), 2),
+        "customerFavorable": round(float(normalized[2]), 2),
+        "neutral": round(float(normalized[3]), 2),
+    }
+
+
 @app.post("/query", response_model=QueryResponse)
 async def query_document(request: QueryRequest):
     """Query the document(s) with optional document filtering."""
@@ -650,6 +879,14 @@ async def query_document(request: QueryRequest):
         )
 
         if not results:
+            default_dist = normalize_sentiment_distribution(
+                {
+                    "vendorFavorable": 0.35,
+                    "balanced": 0.4,
+                    "customerFavorable": 0.15,
+                    "neutral": 0.1,
+                }
+            )
             return QueryResponse(
                 response=json.dumps(
                     {
@@ -661,12 +898,7 @@ async def query_document(request: QueryRequest):
                             "highRiskClauses": 0,
                             "balancedClauses": 0,
                         },
-                        "sentimentDistribution": {
-                            "vendorFavorable": 25,
-                            "balanced": 25,
-                            "customerFavorable": 25,
-                            "neutral": 25,
-                        },
+                        "sentimentDistribution": default_dist,
                         "notableClauses": [],
                         "summary": {
                             "title": "Analysis Summary",
@@ -698,9 +930,13 @@ async def query_document(request: QueryRequest):
             legal_terms = extract_legal_key_terms(contract_topic)
             search_query = f"legal contract {legal_terms} clause precedent"
 
+            # Get legal references first
+            logger.info(f"Getting legal references for contract topic")
+            legal_references = get_legal_info(contract_topic)
+
             # Prepare the prompt for structured output
             prompt = f"""Analyze the following contract sections and provide a structured analysis in JSON format.
-            Focus on legal precedents, industry standards, and regulatory compliance.
+            Focus on contract terms, fairness, and compliance.
 
             Contract sections to analyze:
             {' '.join(contexts)}
@@ -713,19 +949,19 @@ async def query_document(request: QueryRequest):
             5. Industry standards comparison
             6. Regulatory compliance evaluation
             7. Bias indicators
-            8. Legal precedents and implications
 
+            Note: Legal references will be handled separately, focus on analyzing the contract content.
             Format the response as a structured JSON object following the specified schema.
             """
 
             # Configure the response format
             response = client.models.generate_content(
-                model='gemini-2.0-flash-001',
+                model="gemini-2.0-flash-001",
                 contents=prompt,
                 config={
-                    'response_mime_type': 'application/json',
-                    'response_schema': ContractAnalysis
-                }
+                    "response_mime_type": "application/json",
+                    "response_schema": ContractAnalysis,
+                },
             )
 
             # The response will be in JSON format
@@ -733,12 +969,41 @@ async def query_document(request: QueryRequest):
                 # Parse response to JSON
                 analysis_json = json.loads(response.text)
 
-                # Get legal references
-                logger.info(f"Getting legal references for contract topic")
-                legal_references = get_legal_info(contract_topic)
+                # Normalize sentiment distribution
+                if "sentimentDistribution" in analysis_json:
+                    analysis_json["sentimentDistribution"] = (
+                        normalize_sentiment_distribution(
+                            analysis_json["sentimentDistribution"]
+                        )
+                    )
+                else:
+                    # Use default distribution if none provided
+                    analysis_json["sentimentDistribution"] = (
+                        normalize_sentiment_distribution(
+                            {
+                                "vendorFavorable": 0.35,
+                                "balanced": 0.4,
+                                "customerFavorable": 0.15,
+                                "neutral": 0.1,
+                            }
+                        )
+                    )
 
-                # Add legal references to the analysis JSON
-                analysis_json["legalReferences"] = legal_references
+                # Format legal references with proper source and type
+                formatted_legal_refs = []
+                for ref in legal_references:
+                    formatted_legal_refs.append(
+                        {
+                            "title": ref.get("title", ""),
+                            "description": ref.get("description", ""),
+                            "url": ref.get("url", ""),
+                            "source": ref.get("source", "Legal Database Search"),
+                            "type": ref.get("type", "legal_reference"),
+                        }
+                    )
+
+                # Add the legal references from DuckDuckGo search
+                analysis_json["legalReferences"] = formatted_legal_refs
 
                 # Re-encode as JSON string
                 response_text = json.dumps(analysis_json)
@@ -746,36 +1011,45 @@ async def query_document(request: QueryRequest):
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON from Gemini: {str(e)}")
                 # Return a default response if JSON is invalid
-                response_text = json.dumps({
-                    "contractName": f"Contract {request.doc_id}",
-                    "description": "Error processing contract analysis.",
-                    "metrics": {
-                        "overallFairnessScore": 50.0,
-                        "potentialBiasIndicators": 0,
-                        "highRiskClauses": 0,
-                        "balancedClauses": 0
-                    },
-                    "sentimentDistribution": {
-                        "vendorFavorable": 25.0,
-                        "balanced": 25.0,
-                        "customerFavorable": 25.0,
-                        "neutral": 25.0
-                    },
-                    "notableClauses": [],
-                    "summary": {
-                        "title": "Analysis Error",
-                        "description": "An error occurred while analyzing the contract.",
-                        "points": [],
-                        "riskAssessment": {
-                            "level": "neutral",
-                            "label": RiskLevel.NEUTRAL,
-                            "description": "Analysis failed due to technical issues."
-                        }
-                    },
-                    "legalReferences": [],
-                    "industryStandards": [],
-                    "regulatoryGuidelines": []
-                })
+                default_dist = normalize_sentiment_distribution(
+                    {
+                        "vendorFavorable": 0.35,
+                        "balanced": 0.4,
+                        "customerFavorable": 0.15,
+                        "neutral": 0.1,
+                    }
+                )
+                response_text = json.dumps(
+                    {
+                        "contractName": f"Contract {request.doc_id}",
+                        "description": "Error processing contract analysis.",
+                        "metrics": {
+                            "overallFairnessScore": 50.0,
+                            "potentialBiasIndicators": 0,
+                            "highRiskClauses": 0,
+                            "balancedClauses": 0,
+                        },
+                        "sentimentDistribution": default_dist,
+                        "notableClauses": [],
+                        "summary": {
+                            "title": "Analysis Error",
+                            "description": "An error occurred while analyzing the contract.",
+                            "points": [],
+                            "riskAssessment": {
+                                "level": "neutral",
+                                "label": RiskLevel.NEUTRAL,
+                                "description": "Analysis failed due to technical issues.",
+                            },
+                        },
+                        "industryStandards": [],
+                        "regulatoryGuidelines": [],
+                        "legalReferences": (
+                            formatted_legal_refs
+                            if "formatted_legal_refs" in locals()
+                            else []
+                        ),
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Error getting response from Gemini: {str(e)}")
