@@ -594,26 +594,36 @@ export default function ContractSentimentPage() {
 					</h3>
 					<div className="space-y-4">
 						{analysis.legalReferences.map((ref, index) => (
-							<div key={index} className="border-l-4 border-blue-500 pl-4">
-								<h4 className="font-medium text-slate-800">
-									{ref.title}
-								</h4>
-								<p className="text-slate-600 text-sm mb-2">
-									{ref.description}
-								</p>
-								{ref.url && (
-									<a
-										href={ref.url.startsWith('http') ? ref.url : `https://${ref.url.replace(/^\/+/, '')}`}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center"
-									>
-										<svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+							<div key={index} className="border-l-4 border-blue-500 pl-4 py-3 hover:bg-slate-50 transition-colors">
+								<a 
+									href={ref.url} 
+									target="_blank" 
+									rel="noopener noreferrer" 
+									className="block group"
+								>
+									<h4 className="font-medium text-blue-600 group-hover:text-blue-800 transition-colors">
+										{ref.title}
+									</h4>
+									<p className="text-sm text-slate-600 mt-1 mb-2">
+										{ref.description}
+									</p>
+									<div className="flex items-center text-sm text-blue-500 group-hover:text-blue-700">
+										<span>Read more</span>
+										<svg 
+											className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" 
+											fill="none" 
+											stroke="currentColor" 
+											viewBox="0 0 24 24"
+										>
+											<path 
+												strokeLinecap="round" 
+												strokeLinejoin="round" 
+												strokeWidth={2} 
+												d="M9 5l7 7-7 7" 
+											/>
 										</svg>
-										{ref.url.length > 50 ? `${ref.url.substring(0, 47)}...` : ref.url}
-									</a>
-								)}
+									</div>
+								</a>
 							</div>
 						))}
 					</div>

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import os
 import tempfile
 from pathlib import Path
@@ -19,11 +19,14 @@ import time
 import numpy as np
 import psycopg2
 import psycopg2.extras
-from groq import Groq
+from google import genai
 import json
 import requests
 import html
 import re
+from duckduckgo_search import DDGS
+from google.genai.types import GenerationConfig
+import enum
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,10 +35,91 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Initialize Groq client
-groq_client = Groq(
-    api_key=os.getenv("GROQ_API_KEY"),
-)
+# Define enums for contract analysis
+class SentimentLevel(enum.Enum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+
+class RiskLevel(enum.Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    NEUTRAL = "neutral"
+
+# Define Pydantic models for structured output
+class BiasIndicator(BaseModel):
+    label: str
+    value: float
+
+class LegalPrecedent(BaseModel):
+    case: str
+    relevance: str
+    implication: str
+
+class NotableClause(BaseModel):
+    type: str
+    sentiment: str
+    sentimentLabel: SentimentLevel
+    biasScore: float
+    riskLevel: str
+    riskLabel: RiskLevel
+    text: str
+    analysis: str
+    biasIndicators: List[BiasIndicator]
+    industryComparison: str
+    recommendations: List[str]
+    legalPrecedents: List[LegalPrecedent]
+
+class SummaryPoint(BaseModel):
+    title: str
+    description: str
+
+class RiskAssessment(BaseModel):
+    level: str
+    label: RiskLevel
+    description: str
+
+class Summary(BaseModel):
+    title: str
+    description: str
+    points: List[SummaryPoint]
+    riskAssessment: RiskAssessment
+
+class IndustryStandard(BaseModel):
+    name: str
+    description: str
+    complianceStatus: str
+
+class RegulatoryGuideline(BaseModel):
+    regulation: str
+    relevance: str
+    complianceStatus: str
+
+class Metrics(BaseModel):
+    overallFairnessScore: float
+    potentialBiasIndicators: int
+    highRiskClauses: int
+    balancedClauses: int
+
+class SentimentDistribution(BaseModel):
+    vendorFavorable: float
+    balanced: float
+    customerFavorable: float
+    neutral: float
+
+class ContractAnalysis(BaseModel):
+    contractName: str
+    description: str
+    metrics: Metrics
+    sentimentDistribution: SentimentDistribution
+    notableClauses: List[NotableClause]
+    summary: Summary
+    industryStandards: List[IndustryStandard]
+    regulatoryGuidelines: List[RegulatoryGuideline]
+
+# Initialize Gemini
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize FastAPI app
 app = FastAPI(title="Contract Analysis API")
@@ -446,93 +530,90 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Simple DuckDuckGo search function
-def duckduckgo_search(query, max_results=5):
-    """Perform a search using DuckDuckGo."""
-    try:
-        # Clean the query for URL
-        query = query.replace(" ", "+")
-
-        # Make the request to DuckDuckGo
-        url = f"https://html.duckduckgo.com/html/?q={query}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-
-        # Extract search results using regex
-        results = []
-        pattern = r'<a class="result__a" href="(.*?)".*?>(.*?)</a>.*?<a class="result__snippet".*?>(.*?)</a>'
-        matches = re.findall(pattern, response.text, re.DOTALL)
-
-        for i, match in enumerate(matches):
-            if i >= max_results:
-                break
-
-            # Extract the raw URL and decode it
-            raw_url = match[0]
-            if "uddg=" in raw_url:
-                # DuckDuckGo redirects with this parameter
-                url_start = raw_url.find("uddg=") + 5
-                decoded_url = raw_url[url_start:]
-                if "&" in decoded_url:
-                    decoded_url = decoded_url.split("&")[0]
-                # URL decode
-                try:
-                    from urllib.parse import unquote
-
-                    url = unquote(decoded_url)
-                except:
-                    url = decoded_url
-            else:
-                url = raw_url
-
-            # Make sure URL has a protocol
-            if not url.startswith(("http://", "https://")):
-                url = "https://" + url.lstrip("/")
-
-            # Clean HTML from title and snippet
-            title = html.unescape(re.sub(r"<.*?>", "", match[1]))
-            snippet = html.unescape(re.sub(r"<.*?>", "", match[2]))
-
-            results.append({"title": title, "url": url, "snippet": snippet})
-
-        return results
-    except Exception as e:
-        logger.error(f"Error in DuckDuckGo search: {str(e)}")
-        return []
-
-
-# Define a function to get more info about a legal topic
+# Search functions for legal information
 def get_legal_info(topic):
     """Get information about a legal topic using DuckDuckGo search."""
-    search_query = f"legal precedent {topic} law contract"
-    results = duckduckgo_search(search_query)
+    try:
+        # Extract key terms for better search results
+        key_terms = extract_legal_key_terms(topic)
+        search_query = f"contract law {key_terms} legal precedent case law"
 
-    # Format the results
-    formatted_results = []
-    for result in results:
-        formatted_results.append(
-            {
-                "title": result["title"],
-                "description": result["snippet"],
-                "url": result["url"],
-            }
-        )
+        # Use DuckDuckGo search
+        logger.info(f"Searching for legal references with terms: {search_query}")
+        with DDGS() as ddgs:
+            search_results = list(
+                ddgs.text(
+                    search_query,
+                    region="wt-wt",  # Worldwide results
+                    max_results=5,  # Limit to 5 results
+                )
+            )
 
-    return formatted_results
+        # Format the results
+        formatted_results = []
+        for result in search_results:
+            if result.get("link") and result.get("title"):
+                formatted_results.append({
+                    "title": result.get("title", "").strip(),
+                    "description": result.get("body", "").strip(),
+                    "url": result.get("link"),
+                    "source": "Legal Database Search",
+                    "type": "legal_reference"
+                })
+
+        return formatted_results
+
+    except Exception as e:
+        logger.error(f"Error in legal information search: {str(e)}")
+        return []  # Return empty list on error
 
 
-# Replace Composio toolset and agent with direct implementation
-# Remove this section:
-# Initialize Composio toolset and Groq LLM
-# toolset = ComposioToolSet()
-# tools = toolset.get_tools(apps=[App.TAVILY])  # Add Tavily search tool
+def extract_legal_key_terms(text, max_terms=3):
+    """Extract key legal terms from text to improve search quality."""
+    # Common legal contract terms to look for
+    legal_terms = [
+        "indemnification",
+        "liability",
+        "warranty",
+        "termination",
+        "confidentiality",
+        "intellectual property",
+        "payment terms",
+        "force majeure",
+        "arbitration",
+        "jurisdiction",
+        "breach",
+        "damages",
+        "performance",
+        "compliance",
+        "default",
+        "remedies",
+        "assignment",
+        "severability",
+        "waiver",
+        "governing law",
+    ]
+
+    # Lowercase the text for case-insensitive matching
+    text_lower = text.lower()
+
+    # Find terms present in the text
+    found_terms = []
+    for term in legal_terms:
+        if term.lower() in text_lower:
+            found_terms.append(term)
+            if len(found_terms) >= max_terms:
+                break
+
+    # If no key terms found, return a general term
+    if not found_terms:
+        return "contract provisions"
+
+    return " ".join(found_terms)
+
 
 # Initialize Groq LLM
-llm = Groq(api_key=os.getenv("GROQ_API_KEY"))
+llm = client
 
 # Define system message for the agent
 system_message = """You are an expert legal contract analyzer with deep expertise in contract law and fairness assessment.
@@ -608,174 +689,98 @@ async def query_document(request: QueryRequest):
         # Extract the content from the most relevant results
         contexts = [result["content"] for result in results]
 
-        # Get enrichment information using DuckDuckGo search
-        contract_topic = " ".join(
-            contexts[:100]
-        )  # Use a portion of the contract to identify topic
-        legal_info = get_legal_info(contract_topic)
-
-        # Use Groq to analyze the contract with enriched information
+        # Use Groq to analyze the contract
         try:
-            response = groq_client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {
-                        "role": "user",
-                        "content": f"""Analyze the following contract sections with focus on legal precedents, industry standards, and regulatory compliance:
+            # Get contract topic for relevant search
+            contract_topic = " ".join(contexts[:100])
 
-                    Contract sections:
-                    {' '.join(contexts)}
-                    
-                    Additional legal information:
-                    {json.dumps(legal_info, indent=2)}
+            # Extract key legal terms from the contract
+            legal_terms = extract_legal_key_terms(contract_topic)
+            search_query = f"legal contract {legal_terms} clause precedent"
 
-                    Provide a comprehensive analysis including:
-                    1. Fairness and bias assessment
-                    2. Relevant legal precedents
-                    3. Industry standard comparisons
-                    4. Regulatory compliance issues
-                    5. Risk assessment
-                    
-                    Return the analysis in this exact JSON structure:
-                    {{
-                        "contractName": string,
-                        "description": string,
-                        "metrics": {{
-                            "overallFairnessScore": number,
-                            "potentialBiasIndicators": number,
-                            "highRiskClauses": number,
-                            "balancedClauses": number
-                        }},
-                        "sentimentDistribution": {{
-                            "vendorFavorable": number,
-                            "balanced": number,
-                            "customerFavorable": number,
-                            "neutral": number
-                        }},
-                        "notableClauses": [
-                            {{
-                                "type": string,
-                                "sentiment": string,
-                                "sentimentLabel": string,
-                                "biasScore": number,
-                                "riskLevel": string,
-                                "riskLabel": string,
-                                "text": string,
-                                "analysis": string,
-                                "biasIndicators": [
-                                    {{
-                                        "label": string,
-                                        "value": number
-                                    }}
-                                ],
-                                "industryComparison": string,
-                                "recommendations": [string],
-                                "legalPrecedents": [
-                                    {{
-                                        "case": string,
-                                        "relevance": string,
-                                        "implication": string
-                                    }}
-                                ]
-                            }}
-                        ],
-                        "summary": {{
-                            "title": string,
-                            "description": string,
-                            "points": [
-                                {{
-                                    "title": string,
-                                    "description": string
-                                }}
-                            ],
-                            "riskAssessment": {{
-                                "level": string,
-                                "label": string,
-                                "description": string
-                            }}
-                        }},
-                        "legalReferences": [
-                            {{
-                                "title": string,
-                                "description": string,
-                                "url": string
-                            }}
-                        ],
-                        "industryStandards": [
-                            {{
-                                "name": string,
-                                "description": string,
-                                "complianceStatus": string
-                            }}
-                        ],
-                        "regulatoryGuidelines": [
-                            {{
-                                "regulation": string,
-                                "relevance": string,
-                                "complianceStatus": string
-                            }}
-                        ]
-                    }}""",
-                    },
-                ],
-                model="llama-3.3-70b-versatile",
-                temperature=0.2,
-                max_tokens=4000,
+            # Prepare the prompt for structured output
+            prompt = f"""Analyze the following contract sections and provide a structured analysis in JSON format.
+            Focus on legal precedents, industry standards, and regulatory compliance.
+
+            Contract sections to analyze:
+            {' '.join(contexts)}
+
+            Please provide a comprehensive analysis including:
+            1. Overall fairness assessment
+            2. Sentiment analysis of clauses
+            3. Risk assessment
+            4. Notable clauses and their implications
+            5. Industry standards comparison
+            6. Regulatory compliance evaluation
+            7. Bias indicators
+            8. Legal precedents and implications
+
+            Format the response as a structured JSON object following the specified schema.
+            """
+
+            # Configure the response format
+            response = client.models.generate_content(
+                model='gemini-2.0-flash-001',
+                contents=prompt,
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': ContractAnalysis
+                }
             )
 
-            response_text = response.choices[0].message.content
-
-            # Clean up response text to ensure it's valid JSON
-            # Remove markdown code blocks if present
-            response_text = re.sub(r"^```json\s*", "", response_text)
-            response_text = re.sub(r"\s*```$", "", response_text)
-
-            # Try to parse and re-serialize to ensure valid JSON
+            # The response will be in JSON format
             try:
-                # Parse to check if it's valid JSON
-                json_object = json.loads(response_text)
-                # Re-serialize to ensure clean JSON
-                response_text = json.dumps(json_object)
+                # Parse response to JSON
+                analysis_json = json.loads(response.text)
+
+                # Get legal references
+                logger.info(f"Getting legal references for contract topic")
+                legal_references = get_legal_info(contract_topic)
+
+                # Add legal references to the analysis JSON
+                analysis_json["legalReferences"] = legal_references
+
+                # Re-encode as JSON string
+                response_text = json.dumps(analysis_json)
+
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON from Groq: {str(e)}")
+                logger.error(f"Invalid JSON from Gemini: {str(e)}")
                 # Return a default response if JSON is invalid
-                response_text = json.dumps(
-                    {
-                        "contractName": f"Contract {request.doc_id}",
-                        "description": "Error processing contract analysis.",
-                        "metrics": {
-                            "overallFairnessScore": 50,
-                            "potentialBiasIndicators": 0,
-                            "highRiskClauses": 0,
-                            "balancedClauses": 0,
-                        },
-                        "sentimentDistribution": {
-                            "vendorFavorable": 25,
-                            "balanced": 25,
-                            "customerFavorable": 25,
-                            "neutral": 25,
-                        },
-                        "notableClauses": [],
-                        "summary": {
-                            "title": "Analysis Error",
-                            "description": "An error occurred while analyzing the contract.",
-                            "points": [],
-                            "riskAssessment": {
-                                "level": "neutral",
-                                "label": "Unknown",
-                                "description": "Analysis failed due to technical issues.",
-                            },
-                        },
-                        "legalReferences": [],
-                        "industryStandards": [],
-                        "regulatoryGuidelines": [],
-                    }
-                )
+                response_text = json.dumps({
+                    "contractName": f"Contract {request.doc_id}",
+                    "description": "Error processing contract analysis.",
+                    "metrics": {
+                        "overallFairnessScore": 50.0,
+                        "potentialBiasIndicators": 0,
+                        "highRiskClauses": 0,
+                        "balancedClauses": 0
+                    },
+                    "sentimentDistribution": {
+                        "vendorFavorable": 25.0,
+                        "balanced": 25.0,
+                        "customerFavorable": 25.0,
+                        "neutral": 25.0
+                    },
+                    "notableClauses": [],
+                    "summary": {
+                        "title": "Analysis Error",
+                        "description": "An error occurred while analyzing the contract.",
+                        "points": [],
+                        "riskAssessment": {
+                            "level": "neutral",
+                            "label": RiskLevel.NEUTRAL,
+                            "description": "Analysis failed due to technical issues."
+                        }
+                    },
+                    "legalReferences": [],
+                    "industryStandards": [],
+                    "regulatoryGuidelines": []
+                })
 
         except Exception as e:
-            logger.error(f"Error getting response from Groq: {str(e)}")
+            logger.error(f"Error getting response from Gemini: {str(e)}")
             raise HTTPException(
-                status_code=500, detail="Failed to get response from Groq LLM"
+                status_code=500, detail="Failed to get response from Gemini LLM"
             )
 
         return QueryResponse(response=response_text, doc_id=request.doc_id)
