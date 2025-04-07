@@ -228,27 +228,36 @@ export default function ContractSentimentPage() {
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 				<div className="legal-card text-center">
 					<div className="text-3xl font-serif font-bold text-slate-700 mb-2">
-						{analysis.metrics.overallFairnessScore}
+						{analysis.metrics.overallFairnessScore}/10
 					</div>
 					<div className="text-sm font-medium text-slate-600">Fairness Score</div>
+					<div className="text-xs text-slate-500 mt-1">
+						{analysis.metrics.overallFairnessScore >= 9 ? 'Exceptionally fair' :
+						 analysis.metrics.overallFairnessScore >= 7 ? 'Generally fair' :
+						 analysis.metrics.overallFairnessScore >= 4 ? 'Moderately fair' :
+						 'Needs improvement'}
+					</div>
 				</div>
 				<div className="legal-card text-center">
 					<div className="text-3xl font-serif font-bold text-amber-700 mb-2">
 						{analysis.metrics.potentialBiasIndicators}
 					</div>
 					<div className="text-sm font-medium text-slate-600">Risk Indicators</div>
+					<div className="text-xs text-slate-500 mt-1">Number of potential issues found</div>
 				</div>
 				<div className="legal-card text-center">
 					<div className="text-3xl font-serif font-bold text-rose-700 mb-2">
 						{analysis.metrics.highRiskClauses}
 					</div>
 					<div className="text-sm font-medium text-slate-600">Critical Clauses</div>
+					<div className="text-xs text-slate-500 mt-1">Count of high-risk sections</div>
 				</div>
 				<div className="legal-card text-center">
 					<div className="text-3xl font-serif font-bold text-emerald-700 mb-2">
 						{analysis.metrics.balancedClauses}
 					</div>
 					<div className="text-sm font-medium text-slate-600">Balanced Clauses</div>
+					<div className="text-xs text-slate-500 mt-1">Count of fair sections</div>
 				</div>
 			</div>
 

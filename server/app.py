@@ -942,7 +942,7 @@ async def query_document(request: QueryRequest):
             {' '.join(contexts)}
 
             Please provide a comprehensive analysis including:
-            1. Overall fairness assessment
+            1. Overall fairness assessment (provide a score from 0-10, where 10 is perfectly fair)
             2. Sentiment analysis of clauses
             3. Risk assessment
             4. Notable clauses and their implications
@@ -952,6 +952,11 @@ async def query_document(request: QueryRequest):
 
             Note: Legal references will be handled separately, focus on analyzing the contract content.
             Format the response as a structured JSON object following the specified schema.
+            The fairness score should be a number between 0 and 10, where:
+            - 0-3: Highly unfair/biased
+            - 4-6: Moderately fair with some concerns
+            - 7-8: Generally fair
+            - 9-10: Exceptionally fair and balanced
             """
 
             # Configure the response format

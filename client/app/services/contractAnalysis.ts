@@ -143,7 +143,7 @@ export async function generateAnalysis(docId: string) {
 			body: JSON.stringify({
 				query: `Analyze this contract for sentiment, bias, and fairness. 
     Focus on identifying vendor-favorable vs customer-favorable clauses.
-    Provide an overall fairness score out of 100, risk assessment, and recommendations.`,
+    Provide an overall fairness score out of 0-10, risk assessment, and recommendations.`,
 				doc_id: docId,
 			}),
 		});
@@ -327,7 +327,7 @@ export async function getContractAnalysis(analysisId: string) {
 			body: JSON.stringify({
 				query: `Analyze this contract for sentiment, bias, and fairness. 
     Focus on identifying vendor-favorable vs customer-favorable clauses.
-    Provide an overall fairness score out of 100, risk assessment, and recommendations.`,
+    Provide an overall fairness score out of 0-10, risk assessment, and recommendations.`,
 				doc_id: analysisId,
 			}),
 		});
