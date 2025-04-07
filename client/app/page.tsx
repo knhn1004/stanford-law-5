@@ -10,7 +10,7 @@ export default function Home() {
               Clause Clarity
             </h1>
             <p className="text-xl sm:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed font-serif">
-              Professional Contract Analysis for Legal Professionals
+              Contract Analysis for Individuals and SMBs
             </p>
             <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               Upload your contract for comprehensive analysis of fairness, risk, and compliance
